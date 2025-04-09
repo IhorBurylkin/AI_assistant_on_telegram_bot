@@ -3,8 +3,11 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from config.config import (
+    TELEGRAM_BOT_TOKEN,
+    TELEGRAM_INFO_BOT_TOKEN,
+)
 
-TELEGRAM_BOT_TOKEN = "7237137858:AAHMbUb1O222Y_QcEVuNxOcJaIbKJgKprug"#"7715169582:AAFzSVnoseybC6x1MhcBgk1FqHBgkPziXSk"
 session = AiohttpSession()
 storage = MemoryStorage()
 
@@ -15,7 +18,6 @@ bot = Bot(
 )
 dp = Dispatcher(storage=storage)
 
-TELEGRAM_INFO_BOT_TOKEN = "7247288830:AAFT_yb7x8qoK6CAsnL6rLaAoJeDnfHt5KQ"#"7477184454:AAFgfg11Wu5aBFPA_elJeOpJ9d2K8yYHZ-Q"
 session_info_bot = AiohttpSession()
 storage_info = MemoryStorage()
 
