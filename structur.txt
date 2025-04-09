@@ -1,0 +1,60 @@
+chatgpt_tg_bot/
+├── config/
+│   ├── config.json
+│   ├── chat_ids.json
+│   └── white_list.json
+├── handlers/
+│   ├── __init__.py
+│   ├── commands.py
+│   ├── callbacks.py
+│   └── messages.py
+├── services/
+│   ├── __init__.py
+│   ├── json_utils.py
+│   ├── openai_api.py
+│   ├── user_service.py
+│   └── utils.py
+├── scheduler/
+│   ├── __init__.py
+│   └── tasks_scheduler.py
+├── keyboards/
+│   ├── __init__.py
+│   ├── inline_kb.py
+│   └── reply_kb.py
+├── logs/
+│   ├── __init__.py
+│   ├── log.py
+│   └── logs.log
+├── main.py
+├── requirements.txt
+└── Dockerfile (опционально)
+
+
+Пояснение к структуре:
+
+    config/
+        Хранение всех конфигурационных файлов и настроек бота (API ключи, пути файлов и др.).
+
+    handlers:
+        Содержит обработчики сообщений Telegram (команды, inline-кнопки и просто текстовые сообщения).
+        commands.py: /start, /help, /settings и т.д.
+        callbacks.py: обработка inline-кнопок.
+        __init__.py: импортирует все обработчики и регистрирует их в Dispatcher.
+
+    services/:
+        Содержит логику работы с внешними API и обработкой данных (OpenAI, JSON-хранилища, Redis-кэш).
+        Например:
+            openai_service.py: отправка запросов к ChatGPT API.
+            user_service.py: сохранение и получение настроек пользователя.
+            json_service.py: функции работы с JSON (асинхронное чтение и запись через aiofiles).
+
+    scheduler/:
+        Реализует логику запланированных сообщений (например, с использованием APScheduler или встроенного JobQueue aiogram).
+        Позволит легко управлять расписанием сообщений и повторно загружать задачи при перезапуске бота.
+
+    keyboards/:
+        Содержит inline и reply клавиатуры Telegram для удобства интерфейса и быстрого редактирования.
+        Упрощает поддержку и изменение меню, не смешивая интерфейс с бизнес-логикой.
+
+    config/ и logs/:
+        Четко выделенное хранение конфигурационных файлов и логов, легко настраивать без изменения кода.
