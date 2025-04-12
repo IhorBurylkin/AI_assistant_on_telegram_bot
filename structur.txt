@@ -1,6 +1,5 @@
 chatgpt_tg_bot/
-├── bot.py                 # Bot instance imports
-├── bot_instance.py        # Bot and dispatcher initialization
+├── bot_instance.py        # Consolidated bot initialization with global instances
 ├── config/                # Configuration directory
 │   ├── __init__.py        # Configuration imports
 │   ├── config.py          # Configuration loading functions
@@ -21,10 +20,10 @@ chatgpt_tg_bot/
 │   └── logs.log           # Log file
 ├── main.py                # Application entry point
 ├── services/              # Business logic
-│   ├── __init__.py        # Service imports
+│   ├── __init__.py        # Service imports (cleaned up)
 │   ├── db_utils.py        # PostgreSQL database utilities
-│   ├── json_utils.py      # JSON utilities (legacy)
 │   ├── openai_api.py      # AI API integration
+│   ├── token_checker.py   # Bot token verification
 │   ├── user_service.py    # Message processing service
 │   └── utils.py           # Utility functions
 ├── requirements.txt       # Dependencies

@@ -1,7 +1,7 @@
 import asyncio
 import tracemalloc
 from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats, BotCommandScopeAllGroupChats
-from bot_initialization import initialize_bots
+from bot_instance import initialize_bots  # Updated import
 from keyboards import inline_kb, reply_kb
 from services.db_utils import init_db_tables
 from services.db_utils import create_connection, close_connection

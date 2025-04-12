@@ -1,1 +1,0 @@
-from bot_instance import bot, dp, info_bot, dp_info_bot
