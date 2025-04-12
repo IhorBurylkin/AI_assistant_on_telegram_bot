@@ -39,7 +39,7 @@ class MemoryInputFile(AbstractInputFile):
         self.filename = filename
 
     def read(self, *args, **kwargs):
-        # Если первый аргумент не является int или None, игнорируем его
+        # If the first argument is not int or None, ignore it
         if args and not isinstance(args[0], (int, type(None))):
             return self.file.read()
         return self.file.read(*args, **kwargs)
@@ -47,16 +47,16 @@ class MemoryInputFile(AbstractInputFile):
 @callbacks_router.callback_query(lambda call: call.data.startswith("settings:"))
 async def process_settings_callback(query: types.CallbackQuery):
     try:
-        # Определяем chat_id в зависимости от типа чата
+        # Determine chat_id based on chat type
         chat_id = query.message.chat.id if query.message.chat.type == ChatType.PRIVATE else query.from_user.id
 
-        # Получаем язык пользователя, если не найден — используем значение по умолчанию
+        # Get user's language, if not found - use default value
         user_data = await read_user_all_data(chat_id)
         lang = user_data.get("language")
         if not lang:
             lang = DEFAULT_LANGUAGES
 
-        # Определяем команду из callback_data
+        # Determine command from callback_data
         data = query.data.split(":")[1]
 
         if data == "set_model":
@@ -72,11 +72,11 @@ async def process_settings_callback(query: types.CallbackQuery):
             else:
                 await query.answer(text=MESSAGES[lang]['context_disabled'], show_alert=False)
             new_markup = await get_settings_inline(chat_id)
-            # Если разметка изменилась, обновляем ее
+            # If markup changed, update it
             if query.message.reply_markup != new_markup:
                 await query.message.edit_reply_markup(reply_markup=new_markup)
             else:
-                await log_info("⚠️ Разметка не изменилась, обновление отменено.", type_e="warning")
+                await log_info("⚠️ Markup didn't change, update cancelled.", type_e="warning")
         elif data == "web_enabled":
             user_data = await read_user_all_data(chat_id)
             user_model = user_data.get("model")
@@ -102,11 +102,11 @@ async def process_settings_callback(query: types.CallbackQuery):
                 await update_user_data(chat_id, "model", user_model)
                 print("web_disenabled", new_value, user_model)
             new_markup = await get_settings_inline(chat_id)
-            # Если разметка изменилась, обновляем ее
+            # If markup changed, update it
             if query.message.reply_markup != new_markup:
                 await query.message.edit_reply_markup(reply_markup=new_markup)
             else:
-                await log_info("⚠️ Разметка не изменилась, обновление отменено.", type_e="warning")
+                await log_info("⚠️ Markup didn't change, update cancelled.", type_e="warning")
         elif data == "set_answer":
             inline_answer_kb = await get_answer_inline(chat_id)
             await query.message.edit_text(MESSAGES[lang]['answer_selection'], reply_markup=inline_answer_kb)
@@ -131,9 +131,9 @@ async def process_settings_callback(query: types.CallbackQuery):
             await query.message.edit_text(MESSAGES[lang]['settings_title'], reply_markup=inline_settings_kb)
             await query.answer()
 
-        await log_info(f"Callback settings обработан для chat_id {chat_id} с данными: {data}", type_e="info")
+        await log_info(f"Settings callback processed for chat_id {chat_id} with data: {data}", type_e="info")
     except Exception as e:
-        await log_info(f"Ошибка в process_settings_callback для chat_id {chat_id}: {e}", type_e="error")
+        await log_info(f"Error in process_settings_callback for chat_id {chat_id}: {e}", type_e="error")
         raise
 
 @callbacks_router.callback_query(lambda call: call.data.startswith("options:"))
@@ -152,23 +152,23 @@ async def process_options_callback(query: types.CallbackQuery, state: FSMContext
 
         if data == "clear_context":
             await clear_user_context(chat_id)
-            await log_info(f"Контекст для пользователя {chat_id} успешно очищен.", type_e="info")
+            await log_info(f"Context for user {chat_id} successfully cleared.", type_e="info")
             await query.answer(text=MESSAGES[lang]['context_cleared'], show_alert=False)
 
         elif data == "generate_image":
-            # Показываем inline-клавиатуру
+            # Show inline keyboard
             inline_generate_image_kb = await get_generate_image_inline(chat_id)
             await query.message.edit_text(
                 MESSAGES[lang]['generation_image_text'].format(current_resolution, current_quality),
                 reply_markup=inline_generate_image_kb
             )
 
-            # Устанавливаем состояние ожидания текста
+            # Set state waiting for text
             await state.set_state(PromptState.waiting_for_input)
             await query.answer()
 
         elif data == "add_check":
-            # Показываем inline-клавиатуру
+            # Show inline keyboard
             inline_add_check_kb = await get_add_check_inline(chat_id)
             await query.message.edit_text(
                 MESSAGES[lang]['add_check_text'],
@@ -184,7 +184,7 @@ async def process_options_callback(query: types.CallbackQuery, state: FSMContext
             return
 
         elif data == "cancel":
-            # Отменяем состояние ожидания текста
+            # Cancel text input state
             await state.clear()
             await query.answer(text=MESSAGES[lang]['inline_kb']['options']['cancel'], show_alert=False)
             await query.message.delete()
@@ -200,15 +200,15 @@ async def process_options_callback(query: types.CallbackQuery, state: FSMContext
             await state.clear()
             return
 
-        await log_info(f"Callback options обработан для chat_id {chat_id} с данными: {data}", type_e="info")
+        await log_info(f"Options callback processed for chat_id {chat_id} with data: {data}", type_e="info")
 
     except Exception as e:
-        await log_info(f"Ошибка в process_options_callback для chat_id {chat_id}: {e}", type_e="error")
+        await log_info(f"Error in process_options_callback for chat_id {chat_id}: {e}", type_e="error")
         raise
 
 @callbacks_router.message(PromptState.waiting_for_input)
 async def handle_text_input(message: types.Message, state: FSMContext):
-    await log_info(f"[FSM] Промт получен от {message.chat.id}: {message.text}", type_e="debug")
+    await log_info(f"[FSM] Prompt received from {message.chat.id}: {message.text}", type_e="debug")
 
     chat_id = message.chat.id if message.chat.type == ChatType.PRIVATE else message.from_user.id
 
@@ -216,24 +216,24 @@ async def handle_text_input(message: types.Message, state: FSMContext):
     lang = user_data.get("language") or DEFAULT_LANGUAGES
     
     if message.content_type == types.ContentType.TEXT:
-        # Обработка запроса через функцию handle_message (generation_type="image")
+        # Process request through handle_message function (generation_type="image")
         return_message = await handle_message(message, generation_type="image")
-        # Предполагается, что handle_message возвращает кортеж (сообщение, chat_id)
+        # Assuming handle_message returns a tuple (message, chat_id)
         message_to, new_chat_id = return_message[0], return_message[1]
         persistent_menu = await get_persistent_menu(new_chat_id)
         
-        # Проверка: если message_to не начинается с "http", считаем, что это сообщение об ошибке
+        # Check: if message_to doesn't start with "http", consider it an error message
         if not message_to.startswith("http"):
             await message.answer(
                 text=message_to,
                 parse_mode=ParseMode.HTML,
                 reply_markup=persistent_menu
             )
-            await log_info(f"[FSM] Сгенерированное сообщение не является URL: {message_to}", type_e="error")
+            await log_info(f"[FSM] Generated message is not a URL: {message_to}", type_e="error")
             await state.clear()
             return
 
-        # Запрос изображения по полученному URL
+        # Request image from received URL
         image_response = requests.get(message_to)
         if image_response.status_code == 200:
             from io import BytesIO
@@ -245,21 +245,21 @@ async def handle_text_input(message: types.Message, state: FSMContext):
                 parse_mode=ParseMode.HTML
             )
         else:
-            # Обработка остальных кодов ошибки
+            # Handle other error codes
             error_text = f"<b>System:</b> {MESSAGES[lang]['error_load_image']}"
             await message.answer(
                 text=error_text,
                 parse_mode=ParseMode.HTML,
                 reply_markup=persistent_menu
             )
-            await log_info(f"[FSM] Ошибка {image_response.status_code} при загрузке изображения: {message_to}", type_e="error")
+            await log_info(f"[FSM] Error {image_response.status_code} loading image: {message_to}", type_e="error")
         
-        await log_info(f"Сообщение генерации изображения обработано для пользователя {new_chat_id}", type_e="info")
+        await log_info(f"Image generation message processed for user {new_chat_id}", type_e="info")
         
     elif message.content_type == types.ContentType.PHOTO:
-        # Обработка запроса через функцию handle_message (generation_type="check")
+        # Process request through handle_message function (generation_type="check")
         return_message = await handle_message(message, generation_type="check")
-        # Предполагается, что handle_message возвращает кортеж (сообщение, chat_id)
+        # Assuming handle_message returns a tuple (message, chat_id)
         message_to, new_chat_id = return_message[0], return_message[1]
         persistent_menu = await get_persistent_menu(new_chat_id)
         # if message_to.strip() != "<b>System:</b> ":
@@ -268,7 +268,7 @@ async def handle_text_input(message: types.Message, state: FSMContext):
         #         reply_markup=persistent_menu,
         #         parse_mode=ParseMode.HTML
         #     )
-        #     await log_info(f"[FSM] Ошибка при обработке изображения: {message_to}", type_e="error")
+        #     await log_info(f"[FSM] Error processing image: {message_to}", type_e="error")
         # else:
         inline_add_check_accept_kb = await get_add_check_accept_inline(new_chat_id)
         await message.answer(
@@ -277,9 +277,9 @@ async def handle_text_input(message: types.Message, state: FSMContext):
             parse_mode=ParseMode.HTML
         )
     elif message.content_type == types.ContentType.DOCUMENT:
-        # Обработка запроса через функцию handle_message (generation_type="check")
+        # Process request through handle_message function (generation_type="check")
         return_message = await handle_message(message, generation_type="check")
-        # Предполагается, что handle_message возвращает кортеж (сообщение, chat_id)
+        # Assuming handle_message returns a tuple (message, chat_id)
         message_to, new_chat_id = return_message[0], return_message[1]
         persistent_menu = await get_persistent_menu(new_chat_id)
         # if message_to.strip() != "<b>System:</b> ":
@@ -288,7 +288,7 @@ async def handle_text_input(message: types.Message, state: FSMContext):
         #         reply_markup=persistent_menu,
         #         parse_mode=ParseMode.HTML
         #     )
-        #     await log_info(f"[FSM] Ошибка при обработке изображения: {message_to}", type_e="error")
+        #     await log_info(f"[FSM] Error processing image: {message_to}", type_e="error")
         # else:
         inline_add_check_accept_kb = await get_add_check_accept_inline(new_chat_id)
         await message.answer(
@@ -301,16 +301,16 @@ async def handle_text_input(message: types.Message, state: FSMContext):
 @callbacks_router.callback_query(lambda call: call.data.startswith("profile:"))
 async def process_profile_callback(query: types.CallbackQuery):
     try:
-        # Определяем chat_id в зависимости от типа чата
+        # Determine chat_id based on chat type
         chat_id = query.message.chat.id if query.message.chat.type == ChatType.PRIVATE else query.from_user.id
 
-        # Получаем язык пользователя, если не найден — используем значение по умолчанию
+        # Get user's language, if not found - use default value
         user_data = await read_user_all_data(chat_id)
         lang = user_data.get("language")
         if not lang:
             lang = DEFAULT_LANGUAGES
 
-        # Определяем команду из callback_data
+        # Determine command from callback_data
         data = query.data.split(":")[1]
 
         if data == "usage_limit":
@@ -322,57 +322,57 @@ async def process_profile_callback(query: types.CallbackQuery):
             await query.message.edit_text(MESSAGES[lang]['inline_kb']['profile']['profile_title'], reply_markup=inline_profile_kb)
             await query.answer()
 
-        await log_info(f"Callback profile обработан для chat_id {chat_id} с данными: {data}", type_e="info")
+        await log_info(f"Profile callback processed for chat_id {chat_id} with data: {data}", type_e="info")
     except Exception as e:
-        await log_info(f"Ошибка в process_profile_callback для chat_id {chat_id}: {e}", type_e="error")
+        await log_info(f"Error in process_profile_callback for chat_id {chat_id}: {e}", type_e="error")
         raise
 
 @callbacks_router.callback_query(lambda call: call.data.startswith("model:"))
 async def process_set_model_callback(query: types.CallbackQuery):
     try:
-        # Определяем chat_id в зависимости от типа чата
+        # Determine chat_id based on chat type
         chat_id = query.message.chat.id if query.message.chat.type == ChatType.PRIVATE else query.from_user.id
 
-        # Получаем текущий статус web_enabled
+        # Get current web_enabled status
         user_data = await read_user_all_data(chat_id)
         web_enabled = user_data.get("web_enabled")
-        # Извлекаем новую модель из callback_data
+        # Extract new model from callback_data
         new_model = query.data.split(":", 1)[1]
         
-        # Обновляем глобальную модель
+        # Update global model
         global CHATGPT_MODEL
         CHATGPT_MODEL = new_model
 
-        # Если web_enabled активен, корректируем название модели
+        # If web_enabled is active, adjust model name
         if web_enabled:
             if CHATGPT_MODEL == "gpt-4o-mini":
                 CHATGPT_MODEL = "gpt-4o-mini-search-preview"
             elif CHATGPT_MODEL == "gpt-4o":
                 CHATGPT_MODEL = "gpt-4o-search-preview"
 
-        # Обновляем данные пользователя в хранилище
+        # Update user data in storage
         await update_user_data(chat_id, "model", CHATGPT_MODEL)
 
-        # Получаем язык пользователя; если язык не найден, используем значение по умолчанию
+        # Get user's language; if language not found, use default value
         user_data = await read_user_all_data(chat_id)
         lang = user_data.get("language")
         if not lang:
             lang = DEFAULT_LANGUAGES
 
-        await log_info(f"Модель ChatGPT изменена на: {CHATGPT_MODEL} для chat_id {chat_id}", type_e="info")
+        await log_info(f"ChatGPT model changed to: {CHATGPT_MODEL} for chat_id {chat_id}", type_e="info")
 
-        # Обновляем inline-меню настроек и получаем постоянное меню
+        # Update inline settings menu and get persistent menu
         inline_menu = await get_settings_inline(chat_id)
         persistent_menu = await get_persistent_menu(chat_id)
 
         await query.message.edit_text(MESSAGES[lang]['settings_title'])
         await query.message.edit_reply_markup(reply_markup=inline_menu)
 
-        # Отправляем подтверждающее сообщение в приватном чате
+        # Send confirmation message in private chat
         if query.message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
-            # Формируем сообщение в зависимости от языка
+            # Form message based on language
             response_text = (
-                f"<b>System: </b>Модель изменена на: {new_model}"
+                f"<b>System: </b>Model changed to: {new_model}"
                 if lang == "ru" else
                 f"<b>System: </b>Model changed to: {new_model}"
             )
@@ -383,7 +383,7 @@ async def process_set_model_callback(query: types.CallbackQuery):
                 parse_mode=ParseMode.HTML
             )
     except Exception as e:
-        await log_info(f"Ошибка в process_set_model_callback для chat_id {chat_id}: {e}", type_e="error")
+        await log_info(f"Error in process_set_model_callback for chat_id {chat_id}: {e}", type_e="error")
         raise
 
 @callbacks_router.callback_query(lambda call: call.data.startswith("lang:"))
@@ -392,28 +392,28 @@ async def process_lang_callback(query: types.CallbackQuery):
         chosen_lang = query.data.split(":", 1)[1]
         chat_id = query.message.chat.id if query.message.chat.type == ChatType.PRIVATE else query.from_user.id
 
-        # Обновляем язык, если выбран поддерживаемый
+        # Update language if supported
         if chosen_lang in SUPPORTED_LANGUAGES:
             await update_user_data(chat_id, "language", chosen_lang)
         
-        # Получаем обновлённый язык; если не найден, используем значение по умолчанию
+        # Get updated language; if not found, use default value
         user_data = await read_user_all_data(chat_id)
         lang = user_data.get("language")
         if not lang:
             lang = DEFAULT_LANGUAGES
 
-        # Получаем новое inline-меню настроек и постоянное меню
+        # Get new inline settings menu and persistent menu
         inline_menu = await get_settings_inline(chat_id)
         persistent_menu = await get_persistent_menu(chat_id)
 
-        # Обновляем разметку сообщения с меню
+        # Update message markup
         await query.message.edit_text(MESSAGES[lang]['settings_title'])
         await query.message.edit_reply_markup(reply_markup=inline_menu)
 
-        # Отправляем подтверждающее сообщение в приватном чате
+        # Send confirmation message in private chat
         if query.message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
             response_text = (
-                f"<b>System: </b>Язык изменён на: {chosen_lang}"
+                f"<b>System: </b>Language changed to: {chosen_lang}"
                 if lang == "ru" else
                 f"<b>System: </b>Language changed to: {chosen_lang}"
             )
@@ -424,15 +424,15 @@ async def process_lang_callback(query: types.CallbackQuery):
                 parse_mode=ParseMode.HTML
             )
 
-        await log_info(f"Язык изменён для пользователя {chat_id} на {chosen_lang}", type_e="info")
+        await log_info(f"Language changed for user {chat_id} to {chosen_lang}", type_e="info")
     except Exception as e:
-        await log_info(f"Ошибка в process_lang_callback для пользователя {chat_id}: {e}", type_e="error")
+        await log_info(f"Error in process_lang_callback for user {chat_id}: {e}", type_e="error")
         raise
 
 @callbacks_router.callback_query(lambda call: call.data.startswith("answer:"))
 async def process_answer_callback(query: types.CallbackQuery):
     try:
-        # Извлекаем выбранный вариант ответа
+        # Extract selected answer option
         chosen_set_answer = query.data.split(":", 1)[1]
         options = {
             "minimal": [0.1, 0.9],
@@ -442,34 +442,34 @@ async def process_answer_callback(query: types.CallbackQuery):
         }
         selected_value = options.get(chosen_set_answer, [0.1, 0.9])
         
-        # Определяем chat_id
+        # Determine chat_id
         chat_id = query.message.chat.id if query.message.chat.type == ChatType.PRIVATE else query.from_user.id
         
-        # Обновляем данные пользователя: set_answer и set_answer_value
+        # Update user data: set_answer and set_answer_value
         await update_user_data(chat_id, "set_answer", chosen_set_answer)
         await update_user_data(chat_id, "set_answer_temp", selected_value[0])
         await update_user_data(chat_id, "set_answer_top_p", selected_value[1])
         
-        # Получаем язык пользователя, если не найден, используем значение по умолчанию
+        # Get user's language, if not found, use default value
         user_data = await read_user_all_data(chat_id)
         lang = user_data.get("language")
         if not lang:
             lang = DEFAULT_LANGUAGES
         
-        # Получаем обновленное inline-меню и постоянное меню
+        # Get updated inline menu and persistent menu
         inline_menu = await get_settings_inline(chat_id)
         persistent_menu = await get_persistent_menu(chat_id)
         
-        # Обновляем разметку сообщения с меню
+        # Update message markup
         await query.message.edit_text(MESSAGES[lang]['settings_title'])
         await query.message.edit_reply_markup(reply_markup=inline_menu)
         
-        # Отправляем подтверждающее сообщение в приватном чате
+        # Send confirmation message in private chat
         if query.message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
             response_text = (
-                f"<b>System: </b>Точность ответов ИИ: {chosen_set_answer}"
+                f"<b>System: </b>AI response accuracy: {chosen_set_answer}"
                 if lang == "ru"
-                else f"<b>System: </b>Accuracy of AI responses: {chosen_set_answer}"
+                else f"<b>System: </b>AI response accuracy: {chosen_set_answer}"
             )
             await query.message.answer(
                 text=response_text,
@@ -478,60 +478,60 @@ async def process_answer_callback(query: types.CallbackQuery):
                 parse_mode=ParseMode.HTML
             )
         
-        await log_info(f"Ответ настроен для пользователя {chat_id}: {chosen_set_answer}", type_e="info")
+        await log_info(f"Answer configured for user {chat_id}: {chosen_set_answer}", type_e="info")
     except Exception as e:
-        await log_info(f"Ошибка в process_answer_callback для пользователя {chat_id}: {e}", type_e="error")
+        await log_info(f"Error in process_answer_callback for user {chat_id}: {e}", type_e="error")
         raise
 
 @callbacks_router.callback_query(lambda call: call.data.startswith("role:"))
 async def process_role_callback(query: types.CallbackQuery):
     try:
-        # Определяем chat_id
+        # Determine chat_id
         chat_id = query.message.chat.id if query.message.chat.type == ChatType.PRIVATE else query.from_user.id
 
-        # Получаем язык пользователя, если не найден — используем значение по умолчанию
+        # Get user's language, if not found - use default value
         user_data = await read_user_all_data(chat_id)
         lang = user_data.get("language") or DEFAULT_LANGUAGES
 
-        # Получаем текущую роль пользователя (если есть)
+        # Get current user role (if any)
         role_from_user = user_data.get("role") or ''
         roles_list = MESSAGES[lang]['set_role']
         role_system_list = MESSAGES[lang]['set_role_system']
 
-        # Извлекаем выбранную роль из callback_data
+        # Extract selected role from callback_data
         chosen_set_role = query.data.split(":", 1)[1]
 
-        # Если выбран вариант "другая роль" (обычно последний элемент списка), запрашиваем ввод от пользователя
+        # If "other role" option is selected (usually last item in list), request input from user
         if chosen_set_role == roles_list[4]:
             await query.message.answer(MESSAGES[lang]['enter_your_role'], reply_markup=ForceReply(selective=True))
             await query.answer()
             return
 
-        # Определяем соответствующее системное значение роли
+        # Determine corresponding system role value
         options = {
             roles_list[0]: role_system_list[0],
             roles_list[1]: role_system_list[1],
             roles_list[2]: role_system_list[2],
             roles_list[3]: role_system_list[3],
-            roles_list[4]: role_from_user  # если выбрана опция "другая роль", оставляем текущее значение
+            roles_list[4]: role_from_user  # if "other role" option, keep current value
         }
         selected_value = options.get(chosen_set_role, role_system_list[0])
 
-        # Обновляем роль пользователя
+        # Update user role
         await update_user_data(chat_id, "role", selected_value)
 
-        # Получаем обновленное inline-меню настроек и persistent меню
+        # Get updated inline settings menu and persistent menu
         inline_menu = await get_settings_inline(chat_id)
         persistent_menu = await get_persistent_menu(chat_id)
 
-        # Обновляем разметку сообщения
+        # Update message markup
         await query.message.edit_text(MESSAGES[lang]['settings_title'])
         await query.message.edit_reply_markup(reply_markup=inline_menu)
 
-        # Отправляем подтверждение в приватном чате
+        # Send confirmation in private chat
         if query.message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
             confirmation_text = (
-                f"<b>System: </b>Выбранная роль ИИ: {selected_value}"
+                f"<b>System: </b>Selected AI role: {selected_value}"
                 if lang == "ru" else
                 f"<b>System: </b>Selected AI role: {selected_value}"
             )
@@ -542,9 +542,9 @@ async def process_role_callback(query: types.CallbackQuery):
             )
 
         await query.answer()
-        await log_info(f"Роль для пользователя {chat_id} обновлена на: {selected_value}", type_e="info")
+        await log_info(f"Role for user {chat_id} updated to: {selected_value}", type_e="info")
     except Exception as e:
-        await log_info(f"Ошибка в process_role_callback для пользователя {chat_id}: {e}", type_e="error")
+        await log_info(f"Error in process_role_callback for user {chat_id}: {e}", type_e="error")
         raise
 
 @callbacks_router.callback_query(lambda call: call.data.startswith("generation:"))
@@ -564,7 +564,7 @@ async def process_generation_callback(query: types.CallbackQuery):
             setting_type = "back"
             value = None
         else:
-            await query.answer("Некорректный формат данных", show_alert=True)
+            await query.answer("Invalid data format", show_alert=True)
             return
 
         if setting_type == "resolution":
@@ -603,10 +603,10 @@ async def process_generation_callback(query: types.CallbackQuery):
             else:
                 raise
 
-        await log_info(f"[DALL·E] Пользователь {chat_id} обновил {setting_type} на {value}", type_e="info")
+        await log_info(f"[DALL·E] User {chat_id} updated {setting_type} to {value}", type_e="info")
 
     except Exception as e:
-        await log_info(f"[DALL·E] Ошибка в process_generation_callback для chat_id {chat_id}: {e}", type_e="error")
+        await log_info(f"[DALL·E] Error in process_generation_callback for chat_id {chat_id}: {e}", type_e="error")
         raise
 
 @callbacks_router.callback_query(lambda call: call.data.startswith("generation_image:"))
@@ -625,5 +625,5 @@ async def process_generation_image_callback(query: types.CallbackQuery):
         await query.answer()
 
     except Exception as e:
-        await log_info(f"[DALL·E] Ошибка в process_generation_image_callback для chat_id {chat_id}: {e}", type_e="error")
+        await log_info(f"[DALL·E] Error in process_generation_image_callback for chat_id {chat_id}: {e}", type_e="error")
         raise

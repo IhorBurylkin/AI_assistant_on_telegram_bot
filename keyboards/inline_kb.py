@@ -5,20 +5,20 @@ from logs import log_info
 from services.utils import time_until_midnight_utc
 
 async def get_settings_inline(chat_id: int) -> InlineKeyboardMarkup:
-    # Получаем язык пользователя; если не найден, используем значение по умолчанию
+    # Get user's language; if not found, use default value
     user_data = await read_user_all_data(chat_id)
     lang = user_data.get("language")
     if not lang:
         lang = DEFAULT_LANGUAGES
     
-    # Получаем состояние контекста и определяем иконку
+    # Get context state and determine icon
     context_enabled = user_data.get("context_enabled")
     context_icon = "✅" if context_enabled else "❌"
-    # Получаем состояние web_enabled
+    # Get web_enabled state
     web_enabled = user_data.get("web_enabled")
     web_icon = "✅" if web_enabled else "❌"
     
-    # Формируем inline-меню настроек
+    # Form inline settings menu
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=MESSAGES[lang]['settings_set_model'], callback_data="settings:set_model")],
         [InlineKeyboardButton(text=MESSAGES[lang]['settings_context'].format(context_icon), callback_data="settings:toggle_context")],
@@ -29,62 +29,62 @@ async def get_settings_inline(chat_id: int) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text=MESSAGES[lang]['settings_interface_language'], callback_data="settings:interface_language")],
         [InlineKeyboardButton(text=MESSAGES[lang]['settings_close'], callback_data="settings:close")]
     ])
-    await log_info(f"Inline-меню настроек успешно сформировано для пользователя {chat_id}", type_e="info")
+    await log_info(f"Inline settings menu successfully created for user {chat_id}", type_e="info")
     return kb
 
 async def get_options_inline(chat_id: int) -> InlineKeyboardMarkup:
-    # Получаем язык пользователя; если не найден, используем значение по умолчанию
+    # Get user's language; if not found, use default value
     user_data = await read_user_all_data(chat_id)
     lang = user_data.get("language")
     if not lang:
         lang = DEFAULT_LANGUAGES
 
-    # Формируем inline-меню опций
+    # Form inline options menu
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['clear_context'], callback_data="options:clear_context")],
         [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['generate_image'], callback_data="options:generate_image")],
-        [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['add_check'], callback_data="options:add_check")],
+        #[InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['add_check'], callback_data="options:add_check")],
         [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['close'], callback_data="settings:close")]
     ])
-    await log_info(f"Inline меню опций успешно сформировано для пользователя {chat_id}", type_e="info")
+    await log_info(f"Inline options menu successfully created for user {chat_id}", type_e="info")
     return kb
 
 async def get_profile_inline(chat_id: int) -> InlineKeyboardMarkup:
-    # Получаем язык пользователя; если не найден, используем значение по умолчанию
+    # Get user's language; if not found, use default value
     user_data = await read_user_all_data(chat_id)
     lang = user_data.get("language")
     if not lang:
         lang = DEFAULT_LANGUAGES
 
-    # Формируем inline-меню профиля
+    # Form inline profile menu
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['profile']['limits'], callback_data="profile:usage_limit")],
         [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['profile']['close'], callback_data="settings:close")]
     ])
-    await log_info(f"Inline меню профиля успешно сформировано для пользователя {chat_id}", type_e="info")
+    await log_info(f"Inline profile menu successfully created for user {chat_id}", type_e="info")
     return kb
 
 async def get_model_inline(chat_id: int) -> InlineKeyboardMarkup:
-    # Получаем язык пользователя; если не найден, используем значение по умолчанию
+    # Get user's language; if not found, use default value
     user_data = await read_user_all_data(chat_id)
     lang = user_data.get("language")
     if not lang:
         lang = DEFAULT_LANGUAGES
 
-    # Получаем текущую модель и статус web_enabled
+    # Get current model and web_enabled status
     set_model = user_data.get("model")
     web_enabled = user_data.get("web_enabled")
 
     buttons = []
 
-    # Корректируем модель, если включён web_enabled
+    # Adjust model if web_enabled is on
     if web_enabled:
         if set_model == "gpt-4o-mini-search-preview":
             set_model = "gpt-4o-mini"
         elif set_model == "gpt-4o-search-preview":
             set_model = "gpt-4o"
 
-    # Создаем кнопки для выбора модели
+    # Create buttons for model selection
     for i, option in enumerate(MODELS):
         icon = "✅" if set_model == option else ""
         buttons.append([InlineKeyboardButton(
@@ -92,25 +92,25 @@ async def get_model_inline(chat_id: int) -> InlineKeyboardMarkup:
             callback_data=f"model:{option}"
         )])
 
-    # Добавляем кнопку "Назад"
+    # Add "Back" button
     buttons.append([InlineKeyboardButton(
         text=MESSAGES[lang]['settings_back'], callback_data="settings:back"
     )])
 
-    await log_info(f"Inline-меню выбора модели успешно сформировано для пользователя {chat_id}", type_e="info")
+    await log_info(f"Inline model selection menu successfully created for user {chat_id}", type_e="info")
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 async def get_answer_inline(chat_id: int) -> InlineKeyboardMarkup:
-    # Получаем язык пользователя; если не найден, используем значение по умолчанию
+    # Get user's language; if not found, use default value
     user_data = await read_user_all_data(chat_id)
     lang = user_data.get("language")
     if not lang:
         lang = DEFAULT_LANGUAGES
 
-    # Получаем установленное значение ответа
+    # Get set answer value
     set_answer = user_data.get("set_answer")
     
-    # Определяем варианты ответа и формируем кнопки
+    # Define answer options and form buttons
     options = ["minimal", "moderate", "increased", "maximum"]
     buttons = []
     for i, option in enumerate(options):
@@ -120,39 +120,39 @@ async def get_answer_inline(chat_id: int) -> InlineKeyboardMarkup:
             callback_data=f"answer:{option}"
         )])
     
-    # Добавляем кнопку "Назад"
+    # Add "Back" button
     buttons.append([InlineKeyboardButton(
         text=MESSAGES[lang]['settings_back'],
         callback_data="settings:back"
     )])
     
-    await log_info(f"Inline меню 'answer' успешно сформировано для пользователя {chat_id}", type_e="info")
+    await log_info(f"Inline 'answer' menu successfully created for user {chat_id}", type_e="info")
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 async def get_role_inline(chat_id: int) -> InlineKeyboardMarkup:
 
-    # Получаем язык пользователя; если не найден, используем значение по умолчанию
+    # Get user's language; if not found, use default value
     user_data = await read_user_all_data(chat_id)
     lang = user_data.get("language")
     if not lang:
         lang = DEFAULT_LANGUAGES
 
-    # Получаем роль пользователя и списки ролей из сообщений
+    # Get user role and role lists from messages
     role_from_db = user_data.get("role")
     roles_list = MESSAGES[lang]['set_role']
     roles_system_list = MESSAGES[lang]['set_role_system']
 
-    # Асинхронная функция для получения индекса текущей роли
+    # Asynchronous function to get current role index
     async def get_current_role(text: str) -> int:
         try:
             return roles_system_list.index(text)
         except ValueError:
-            return 4  # значение по умолчанию
+            return 4  # default value
 
     current_role_index = await get_current_role(role_from_db)
     current_role = roles_list[current_role_index]
 
-    # Формируем inline-кнопки для каждой роли
+    # Form inline buttons for each role
     buttons = []
     for role_name in roles_list:
         icon = "✅" if role_name == current_role else ""
@@ -161,17 +161,17 @@ async def get_role_inline(chat_id: int) -> InlineKeyboardMarkup:
             callback_data=f"role:{role_name}"
         )])
 
-    # Добавляем кнопку "Назад"
+    # Add "Back" button
     buttons.append([InlineKeyboardButton(
         text=MESSAGES[lang]['settings_back'],
         callback_data="settings:back"
     )])
 
-    await log_info(f"Inline меню ролей успешно сформировано для пользователя {chat_id}", type_e="info")
+    await log_info(f"Inline roles menu successfully created for user {chat_id}", type_e="info")
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 async def get_generation_inline(chat_id: int) -> InlineKeyboardMarkup:
-    # Получаем язык пользователя; если не найден, используем значение по умолчанию
+    # Get user's language; if not found, use default value
     user_data = await read_user_all_data(chat_id)
     lang = user_data.get("language")
     if not lang:
@@ -180,23 +180,23 @@ async def get_generation_inline(chat_id: int) -> InlineKeyboardMarkup:
     resolutions = MESSAGES[lang]["set_resolution"]
     qualities = MESSAGES[lang]["set_quality"]
 
-    # Получаем текущее значение генерации
+    # Get current generation value
     current_resolution = user_data.get("resolution", resolutions[0])
-    quality_code = user_data.get("quality", "standard")  # значение в БД: "standard" или "hd"
+    quality_code = user_data.get("quality", "standard")  # DB value: "standard" or "hd"
 
-    # Маппинг для отображения пользователю
+    # Mapping for user display
     quality_map = {
-        "standard": qualities[0],  # "Обычная"
-        "hd": qualities[1]         # "Высокая"
+        "standard": qualities[0],  # "Normal"
+        "hd": qualities[1]         # "High"
     }
     current_quality = quality_map.get(quality_code, qualities[0])
 
-    # Вспомогательная функция для добавления чеков
+    # Helper function to add checkmarks
     def with_checkmark(value, current):
         return f"{value} ✅" if value.lower() == current.lower() else value
-    # Формируем inline-кнопки для каждого варианта генерации
+    # Form inline buttons for each generation option
 
-    # Кнопки разрешения
+    # Resolution buttons
     res_buttons = [
         InlineKeyboardButton(
             text=with_checkmark(val, current_resolution),
@@ -205,7 +205,7 @@ async def get_generation_inline(chat_id: int) -> InlineKeyboardMarkup:
         for val in resolutions
     ]
 
-    # Кнопки качества
+    # Quality buttons
     qual_buttons = [
         InlineKeyboardButton(
             text=with_checkmark(val, current_quality),
@@ -214,25 +214,25 @@ async def get_generation_inline(chat_id: int) -> InlineKeyboardMarkup:
         for val in qualities
     ]
 
-    # Добавляем кнопку "Назад"
+    # Add "Back" button
     back_button = [
         InlineKeyboardButton(
             text=MESSAGES[lang]['settings_back'],
             callback_data="settings:back"
         )
     ]
-    # Формируем inline-клавиатуру
+    # Form inline keyboard
     inline_keyboard = [
         res_buttons,
         qual_buttons,
         back_button
     ]
 
-    await log_info(f"Inline меню 'generation' успешно сформировано для пользователя {chat_id}", type_e="info")
+    await log_info(f"Inline 'generation' menu successfully created for user {chat_id}", type_e="info")
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 async def get_language_inline(chat_id: int) -> InlineKeyboardMarkup:
-    # Получаем язык пользователя; если не найден, используем значение по умолчанию
+    # Get user's language; if not found, use default value
     user_data = await read_user_all_data(chat_id)
     lang = user_data.get("language")
     if not lang:
@@ -245,11 +245,11 @@ async def get_language_inline(chat_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="🇪🇸 Español", callback_data="lang:es")],
         [InlineKeyboardButton(text=MESSAGES[lang]['settings_back'], callback_data="settings:back")]
     ])
-    await log_info(f"Inline меню языков успешно сформировано для пользователя {chat_id}", type_e="info")
+    await log_info(f"Inline languages menu successfully created for user {chat_id}", type_e="info")
     return kb
 
 async def get_generate_image_inline(chat_id: int) -> InlineKeyboardMarkup:
-    # Получаем язык пользователя; если не найден, используем значение по умолчанию
+    # Get user's language; if not found, use default value
     user_data = await read_user_all_data(chat_id)
     lang = user_data.get("language")
     if not lang:
@@ -258,11 +258,11 @@ async def get_generate_image_inline(chat_id: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['back'], callback_data="options:back")]
     ])
-    await log_info(f"Inline меню генерации изображений успешно сформировано для пользователя {chat_id}", type_e="info")
+    await log_info(f"Inline image generation menu successfully created for user {chat_id}", type_e="info")
     return kb
 
 async def get_add_check_inline(chat_id: int) -> InlineKeyboardMarkup:
-    # Получаем язык пользователя; если не найден, используем значение по умолчанию
+    # Get user's language; if not found, use default value
     user_data = await read_user_all_data(chat_id)
     lang = user_data.get("language")
     if not lang:
@@ -271,11 +271,11 @@ async def get_add_check_inline(chat_id: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['back'], callback_data="options:back")]
     ])
-    await log_info(f"Inline меню добавления чеков успешно сформировано для пользователя {chat_id}", type_e="info")
+    await log_info(f"Inline add check menu successfully created for user {chat_id}", type_e="info")
     return kb
 
 async def get_add_check_accept_inline(chat_id: int) -> InlineKeyboardMarkup:
-    # Получаем язык пользователя; если не найден, используем значение по умолчанию
+    # Get user's language; if not found, use default value
     user_data = await read_user_all_data(chat_id)
     lang = user_data.get("language")
     if not lang:
@@ -285,25 +285,25 @@ async def get_add_check_accept_inline(chat_id: int) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="✅", callback_data="options:accept"),
         InlineKeyboardButton(text="❌", callback_data="options:cancel")],
     ])
-    await log_info(f"Inline меню подтверждения чеков успешно сформировано для пользователя {chat_id}", type_e="info")
+    await log_info(f"Inline check confirmation menu successfully created for user {chat_id}", type_e="info")
     return kb
 
 async def get_limits_inline(chat_id: int) -> InlineKeyboardMarkup:
     try:
-        # Вычисляем время до полуночи
+        # Calculate time until midnight
         remaining_time = await time_until_midnight_utc()
         total_seconds = int(remaining_time.total_seconds())
         hours, remainder = divmod(total_seconds, 3600)
         minutes, _ = divmod(remainder, 60)
         formatted_time = f"{hours:02d}:{minutes:02d}"
 
-        # Определяем chat_id и получаем язык пользователя
+        # Determine chat_id and get user's language
         user_data = await read_user_all_data(chat_id)
         lang = user_data.get("language")
         if not lang:
             lang = DEFAULT_LANGUAGES
 
-        # Получаем количество запросов и токенов, список лимитов и категорию
+        # Get number of requests and tokens, list of limits and category
         tokens = user_data.get("tokens")
         requests = user_data.get("requests")
         which_list = user_data.get("in_limit_list")
@@ -311,7 +311,7 @@ async def get_limits_inline(chat_id: int) -> InlineKeyboardMarkup:
         lost_req = LIMITS[which_list][0] - requests
         lost_tokens = LIMITS[which_list][1] - tokens
 
-        # Формируем сообщение с лимитами
+        # Form message with limits
         if chat_id in WHITE_LIST:
             message_to_send = (
                 f"{MESSAGES[lang]['limits'].format(lost_req, lost_tokens, formatted_time)}\n\n"
@@ -320,13 +320,13 @@ async def get_limits_inline(chat_id: int) -> InlineKeyboardMarkup:
         else:
             message_to_send = MESSAGES[lang]['limits'].format(lost_req, lost_tokens, formatted_time)
 
-        # Формируем inline-меню с лимитами
+        # Form inline menu with limits
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text=MESSAGES[lang]['settings_back'], callback_data="profile:back")]
         ])
 
-        await log_info(f"Inline limits успешно выполнена для chat_id {chat_id}", type_e="info")
+        await log_info(f"Inline limits successfully executed for chat_id {chat_id}", type_e="info")
         return kb, message_to_send
     except Exception as e:
-        await log_info(f"Ошибка в command_limits: {e}", type_e="error")
+        await log_info(f"Error in command_limits: {e}", type_e="error")
         raise

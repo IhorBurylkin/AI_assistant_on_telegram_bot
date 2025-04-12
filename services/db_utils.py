@@ -37,32 +37,32 @@ conn = None
 async def create_connection():
     global conn
     conn = await asyncpg.connect(DB_DSN)
-    await log_info("Соединение с PostgreSQL установлено", type_e="info")
+    await log_info("PostgreSQL connection established", type_e="info")
 
 async def close_connection():
     global conn
     await conn.close()
-    await log_info("Соединение с PostgreSQL закрыто", type_e="info")
+    await log_info("PostgreSQL connection closed", type_e="info")
 
 async def init_db_tables():
     """
-    Асинхронная функция для проверки и инициализации таблиц в PostgreSQL.
+    Asynchronous function for checking and initializing tables in PostgreSQL.
     
-    Функция выполняет следующие шаги:
-      1. Устанавливает асинхронное соединение с базой данных.
-      2. Для каждой таблицы из TABLE_SCHEMAS:
-         - Проверяет, существует ли таблица.
-         - Если таблица отсутствует, создаёт её с требуемыми колонками.
-         - Если таблица существует, проверяет наличие всех необходимых колонок.
-           Если какая-то колонка отсутствует, добавляет её через ALTER TABLE.
-      3. Закрывает соединение.
-    В случае ошибок логирование производится с помощью log_info.
+    The function performs the following steps:
+      1. Establishes an asynchronous connection to the database.
+      2. For each table in TABLE_SCHEMAS:
+         - Checks if the table exists.
+         - If the table doesn't exist, creates it with the required columns.
+         - If the table exists, checks for all necessary columns.
+           If any column is missing, adds it using ALTER TABLE.
+      3. Closes the connection.
+    In case of errors, logging is done using log_info.
     """
     global conn
     try:
-        # Перебираем каждую таблицу из схемы
+        # Iterate through each table in the schema
         for table_name, columns in TABLE_SCHEMAS.items():
-            # Проверяем, существует ли таблица
+            # Check if the table exists
             table_exists_query = """
                 SELECT EXISTS (
                     SELECT FROM information_schema.tables 
@@ -72,13 +72,13 @@ async def init_db_tables():
             exists = await conn.fetchval(table_exists_query, table_name)
             
             if not exists:
-                # Если таблица отсутствует, формируем запрос CREATE TABLE с требуемыми колонками
+                # If the table doesn't exist, create a CREATE TABLE query with required columns
                 columns_def = ", ".join([f"{col} {col_type}" for col, col_type in columns.items()])
                 create_query = f"CREATE TABLE {table_name} ({columns_def});"
                 await conn.execute(create_query)
-                await log_info(f"Таблица %s создана с колонками: %s, {table_name}, {columns_def}", type_e="info")
+                await log_info(f"Table %s created with columns: %s, {table_name}, {columns_def}", type_e="info")
             else:
-                # Если таблица существует, получаем список существующих колонок
+                # If the table exists, get a list of existing columns
                 columns_query = """
                     SELECT column_name FROM information_schema.columns 
                     WHERE table_schema = 'public' AND table_name = $1;
@@ -86,309 +86,309 @@ async def init_db_tables():
                 existing_columns = await conn.fetch(columns_query, table_name)
                 existing_columns = {record["column_name"] for record in existing_columns}
                 
-                # Проверяем и добавляем недостающие колонки
+                # Check and add missing columns
                 for col, col_type in columns.items():
                     if col not in existing_columns:
                         alter_query = f"ALTER TABLE {table_name} ADD COLUMN {col} {col_type};"
                         await conn.execute(alter_query)
-                        await log_info(f"Колонка %s добавлена в таблицу %s, {col}, {table_name}", type_e="info")
+                        await log_info(f"Column %s added to table %s, {col}, {table_name}", type_e="info")
     except Exception as e:
-        await log_info(f"Ошибка при инициализации таблиц: %s, {e}", type_e="error")
+        await log_info(f"Error initializing tables: %s, {e}", type_e="error")
         raise
 
 async def user_exists(user_id: int) -> bool:
     """
-    Асинхронная функция для проверки наличия user_id в базе данных PostgreSQL.
+    Asynchronous function to check if user_id exists in the PostgreSQL database.
     
-    Параметры:
-      user_id: int - идентификатор пользователя, который нужно найти.
+    Parameters:
+      user_id: int - identifier of the user to find.
       
-    Возвращает:
-      True, если пользователь найден, False, если пользователь не существует или произошла ошибка.
+    Returns:
+      True if the user is found, False if the user doesn't exist or an error occurred.
     """
     global conn
     try:
-        # Выполняем запрос для проверки наличия пользователя.
-        # Здесь таблица называется "chat_ids", и предполагается, что в ней есть колонка "user_id".
+        # Execute a query to check if the user exists.
+        # Here the table is called "chat_ids", and it's assumed to have a "user_id" column.
         query = "SELECT 1 FROM chat_ids WHERE user_id = $1 LIMIT 1;"
         result = await conn.fetchval(query, user_id)
         
-        await log_info(f"Проверка наличия user_id %s в таблице chat_ids выполнена успешно, {user_id}", type_e="info")
+        await log_info(f"Check for user_id %s in chat_ids table completed successfully, {user_id}", type_e="info")
         
-        # Если result не None, значит пользователь найден.
+        # If result is not None, the user was found.
         return True if result else False
     except Exception as e:
-        await log_info(f"Ошибка при проверке наличия {user_id} %s: %s, {user_id}, {e}", type_e="error")
+        await log_info(f"Error checking for user {user_id} %s: %s, {user_id}, {e}", type_e="error")
         return False
 
 async def write_json(table_name: str, data):
     """
-    Асинхронная запись JSON-данных в таблицу PostgreSQL.
+    Asynchronous writing of JSON data to a PostgreSQL table.
     
-    Параметры:
-      table_name: str - имя таблицы, в которой хранится JSON (ожидается наличие столбца "data" типа JSON).
-      data: dict - данные, которые будут сохранены в виде JSON.
+    Parameters:
+      table_name: str - name of the table that stores JSON (a "data" column of JSON type is expected).
+      data: dict - data to be saved as JSON.
     
-    Возвращает:
-      None. В случае ошибки логируется сообщение.
+    Returns:
+      None. In case of an error, a message is logged.
     
-    Примечание: если в таблице используется механизм UPSERT (например, по первичному ключу),
-               можно настроить запрос с ON CONFLICT, чтобы обновлять существующую запись.
+    Note: if the table uses an UPSERT mechanism (e.g., by primary key),
+         you can configure the query with ON CONFLICT to update an existing record.
     """
     global conn
     try:
-        # Преобразуем данные в JSON-совместимый формат, если необходимо (asyncpg умеет работать с dict)
-        # Здесь можно использовать json.dumps, если требуется сохранить как строку:
+        # Convert data to JSON-compatible format if needed (asyncpg can work with dict)
+        # You can use json.dumps if you need to save as a string:
         # json_data = json.dumps(data, ensure_ascii=False, indent=4)
-        # Но asyncpg автоматически преобразует dict в тип json
+        # But asyncpg automatically converts dict to json type
         
-        # Пример запроса: вставляем данные в таблицу.
-        # Если в таблице есть уникальный ключ (например, "id"), можно использовать ON CONFLICT для UPSERT.
-        # Здесь приведён простой пример INSERT.
+        # Query example: insert data into the table.
+        # If the table has a unique key (e.g., "id"), you can use ON CONFLICT for UPSERT.
+        # Here's a simple INSERT example.
         query = f"INSERT INTO {table_name} (data) VALUES ($1);"
         await conn.execute(query, data)
         
-        # Логируем успешную запись
-        await log_info(f"Успешно записаны JSON-данные в таблицу: %s, {table_name}", type_e="info")
+        # Log successful write
+        await log_info(f"Successfully wrote JSON data to table: %s, {table_name}", type_e="info")
     except asyncpg.exceptions.UndefinedTableError:
-        # Таблица не найдена
-        await log_info(f"Таблица не найдена: %s, {table_name}", type_e="error")
+        # Table not found
+        await log_info(f"Table not found: %s, {table_name}", type_e="error")
     except Exception as e:
-        # Обработка других ошибок
-        await log_info(f"Ошибка записи JSON в таблицу %s: %s, {table_name}, {e}", type_e="error")
+        # Handle other errors
+        await log_info(f"Error writing JSON to table %s: %s, {table_name}, {e}", type_e="error")
     return None
 
 async def read_user_data(chat_id: int, key: str = None):
     """
-    Асинхронно запрашивает данные пользователя из таблицы "chat_ids" в базе PostgreSQL.
+    Asynchronously queries user data from the "chat_ids" table in the PostgreSQL database.
     
-    Аргументы:
-      chat_id (int): Идентификатор пользователя, который ищется в колонке user_id.
-      key (str, опционально): Если указан, функция вернет значение этого ключа из найденной строки.
-                             Если key=None, функция вернет всю строку (в виде словаря).
+    Arguments:
+      chat_id (int): User identifier to be searched in the user_id column.
+      key (str, optional): If specified, the function returns the value of this key from the found row.
+                          If key=None, the function returns the entire row (as a dictionary).
                              
-    Возвращает:
-      Словарь с данными пользователя, если запись найдена и key=None,
-      или значение по указанному ключу, если key задан.
-      Если запись не найдена или произошла ошибка, возвращает None.
+    Returns:
+      A dictionary with user data if the record is found and key=None,
+      or the value for the specified key if key is set.
+      If the record is not found or an error occurs, returns None.
     """
     global conn
     try:
-        # Выполняем запрос: ищем строку в таблице chat_ids по значению user_id
+        # Execute query: find row in chat_ids table by user_id value
         query = "SELECT * FROM chat_ids WHERE user_id = $1 LIMIT 1;"
         row = await conn.fetchrow(query, chat_id)
-        await log_info(f"Успешно выполнен запрос для chat_id: %s, {chat_id}", type_e="info")
+        await log_info(f"Query for chat_id: %s executed successfully, {chat_id}", type_e="info")
         
         if row is not None:
-            # Преобразуем результат в словарь для удобного доступа к полям
+            # Convert result to dictionary for easy field access
             row_dict = dict(row)
             if key is None:
                 return row_dict
             else:
-                # Если ключ указан, возвращаем его значение из найденной строки
+                # If key is specified, return its value from the found row
                 return row_dict.get(key)
         else:
             return None
 
     except asyncpg.exceptions.UndefinedTableError:
-        await log_info("Таблица 'chat_ids' не найдена.", type_e="error")
+        await log_info("Table 'chat_ids' not found.", type_e="error")
     except Exception as e:
-        await log_info(f"Произошла непредвиденная ошибка при запросе chat_id %s: %s, {chat_id}, {e}", type_e="error")
+        await log_info(f"An unexpected error occurred when querying chat_id %s: %s, {chat_id}, {e}", type_e="error")
     return None
 
 async def read_user_all_data(chat_id: int):
     """
-    Асинхронно запрашивает данные из таблицы "chat_ids" в PostgreSQL для указанного chat_id.
+    Asynchronously queries data from the "chat_ids" table in PostgreSQL for the specified chat_id.
     
-    Аргументы:
-      chat_id (int): Идентификатор пользователя, который ищется в колонке user_id.
+    Arguments:
+      chat_id (int): User identifier to be searched in the user_id column.
     
-    Возвращает:
-      Запись (Record) с данными пользователя, если найдена, иначе None.
+    Returns:
+      A Record with user data if found, otherwise None.
     """
     global conn
     try:
         
-        # Выполняем запрос для поиска записи по user_id (chat_id)
+        # Execute query to find record by user_id (chat_id)
         query = "SELECT * FROM chat_ids WHERE user_id = $1"
         row = await conn.fetchrow(query, chat_id)
         
-        # Логируем успешное выполнение запроса
-        await log_info(f"Успешно выполнен запрос для chat_id: %s, {chat_id}", type_e="info")
+        # Log successful query execution
+        await log_info(f"Query for chat_id: %s executed successfully, {chat_id}", type_e="info")
         
-        # Если запись найдена, возвращаем её; иначе возвращаем None
+        # If record is found, return it; otherwise return None
         return row
     except Exception as e:
-        # Логируем ошибку и возвращаем None
-        await log_info(f"Ошибка при запросе данных для chat_id %s: %s, {chat_id}, {e}", type_e="error")
+        # Log error and return None
+        await log_info(f"Error querying data for chat_id %s: %s, {chat_id}, {e}", type_e="error")
         return None
     
 async def write_user_to_json(file_path: str, user_data: dict):
     """
-    Асинхронная функция для записи данных в таблицу PostgreSQL.
+    Asynchronous function for writing data to a PostgreSQL table.
     
-    Аргументы:
-      file_path (str): Имя таблицы, в которую будут записаны данные.
-      user_data (dict): Данные для записи, где каждый ключ соответствует названию колонки.
+    Arguments:
+      file_path (str): Name of the table to which data will be written.
+      user_data (dict): Data to write, where each key corresponds to a column name.
     
-    Функция формирует динамический SQL-запрос на вставку с использованием имен колонок и
-    параметризованных плейсхолдеров, выполняет запрос, логирует успех или ошибку и закрывает соединение.
+    The function creates a dynamic SQL INSERT query using column names and
+    parameterized placeholders, executes the query, logs success or error, and closes the connection.
     """
     global conn
     try:
-        # Получаем список колонок и значений из словаря
+        # Get list of columns and values from dictionary
         columns = list(user_data.keys())
         values = list(user_data.values())
         
-        # Формируем строку с названиями колонок, разделёнными запятыми
+        # Form string with column names separated by commas
         columns_str = ", ".join(columns)
         
-        # Формируем строку параметров в виде $1, $2, ..., $n
+        # Form string of parameters as $1, $2, ..., $n
         placeholders = ", ".join([f"${i+1}" for i in range(len(columns))])
         
-        # Формируем запрос INSERT
+        # Form INSERT query
         query = f"INSERT INTO {file_path} ({columns_str}) VALUES ({placeholders});"
         
-        # Выполняем запрос с параметрами
+        # Execute query with parameters
         await conn.execute(query, *values)
-        await log_info(f"Успешно записаны данные в таблицу: %s, {file_path}", type_e="info")
+        await log_info(f"Data successfully written to table: %s, {file_path}", type_e="info")
     except Exception as e:
-        await log_info(f"Ошибка записи данных в таблицу %s: %s, {file_path}, {e}", type_e="error")
+        await log_info(f"Error writing data to table %s: %s, {file_path}, {e}", type_e="error")
         return None   
 
 async def update_user_data(chat_id: int, key: str, value):
     """
-    Асинхронная функция обновления данных пользователя в таблице "chat_ids" PostgreSQL.
+    Asynchronous function for updating user data in the "chat_ids" table in PostgreSQL.
     
-    Аргументы:
-      chat_id (int): Идентификатор пользователя, который ищется в колонке user_id.
-      key (str): Имя колонки, которую необходимо обновить.
-      value: Новое значение для указанной колонки.
+    Arguments:
+      chat_id (int): User identifier to be searched in the user_id column.
+      key (str): Name of the column to update.
+      value: New value for the specified column.
       
-    Если запись с user_id = chat_id найдена, функция обновляет значение колонки key на value.
+    If a record with user_id = chat_id is found, the function updates the value of column key to value.
     """
     global conn
     try:
-        # Формируем SQL-запрос для обновления. 
-        # Внимание: имя колонки (key) нельзя параметризовать, поэтому предполагается, 
-        # что значение key безопасно и валидно.
+        # Form SQL query for update. 
+        # Note: column name (key) cannot be parameterized, so it's assumed
+        # that the key value is safe and valid.
         query = f"UPDATE chat_ids SET {key} = $2 WHERE user_id = $1;"
         
-        # Выполняем запрос. Метод execute вернёт строку вида "UPDATE <n>" при успешном обновлении.
+        # Execute query. The execute method will return a string like "UPDATE <n>" on successful update.
         result = await conn.execute(query, chat_id, value)
         
-        await log_info(f"Данные обновлены для chat_id %s, ключ %s, новое значение: %s, {chat_id}, {key}, {value}", type_e="info")
+        await log_info(f"Data updated for chat_id %s, key %s, new value: %s, {chat_id}, {key}, {value}", type_e="info")
     except Exception as e:
-        await log_info(f"Ошибка обновления данных для chat_id %s, ключ %s: %s, {chat_id}, {key}, {e}", type_e="error")
+        await log_info(f"Error updating data for chat_id %s, key %s: %s, {chat_id}, {key}, {e}", type_e="error")
 
 async def get_chat_history(chat_id: int):
     """
-    Асинхронная функция для получения всей строки из таблицы "context" в PostgreSQL,
-    где значение chat_id найдено в колонке user_id.
+    Asynchronous function to retrieve the entire row from the "context" table in PostgreSQL,
+    where the chat_id value is found in the user_id column.
 
-    Аргументы:
-      chat_id (int): Идентификатор чата (user_id) для поиска записи.
+    Arguments:
+      chat_id (int): Chat identifier (user_id) to search for the record.
 
-    Возвращает:
-      Словарь с данными строки, если запись найдена, или None, если записи нет или произошла ошибка.
+    Returns:
+      A dictionary with row data if the record is found, or None if the record doesn't exist or an error occurred.
     """
     global conn
     try:
-        # Выполняем запрос для поиска записи по user_id в таблице "context"
+        # Execute query to find record by user_id in "context" table
         query = "SELECT context FROM context WHERE user_id = $1 LIMIT 1;"
         row = await conn.fetchrow(query, chat_id)
 
         if row is not None:
-            # Извлекаем значение из колонки context; если значение None, используем пустой список
+            # Extract value from context column; if value is None, use empty list
             context_list = row["context"]
             if isinstance(context_list, str):
                 context_list = json.loads(context_list)
         else:
-            # Если записи не существует, начинаем с пустого списка и создаём новую запись
+            # If record doesn't exist, start with empty list and create new record
             context_list = []
         
-        # Логируем успешное выполнение запроса
-        await log_info(f"Успешно получена история чата для chat_id: %s, {chat_id}", type_e="info")
+        # Log successful query execution
+        await log_info(f"Chat history successfully retrieved for chat_id: %s, {chat_id}", type_e="info")
         
-        # Если запись найдена, возвращаем её в виде словаря, иначе None
+        # If record is found, return it as dictionary, otherwise None
         return context_list
     except Exception as e:
-        # Логируем возникшую ошибку и возвращаем None
-        await log_info(f"Ошибка получения истории чата для chat_id %s: %s, {chat_id}, {e}", type_e="error")
+        # Log the error and return None
+        await log_info(f"Error retrieving chat history for chat_id %s: %s, {chat_id}, {e}", type_e="error")
         return None 
     
 async def update_chat_history(chat_id: int, new_message: dict):
     """
-    Асинхронно обновляет историю чата для заданного chat_id в таблице "context" PostgreSQL.
+    Asynchronously updates the chat history for a given chat_id in the "context" table of PostgreSQL.
     
-    Функция выполняет следующие шаги:
-      1. Устанавливает соединение с базой данных.
-      2. Ищет запись в таблице "context", где user_id равен chat_id.
-      3. Если запись найдена, извлекает значение колонки context, которое должно быть списком.
-         Если список пуст или значение отсутствует, устанавливает его как [new_message].
-         Если список не пуст, добавляет new_message в конец списка.
-      4. Если после добавления длина списка превышает 4 элементов, оставляет только последние 4 сообщения.
-      5. Обновляет запись в базе данными нового списка.
-      6. Закрывает соединение и логирует результат.
+    The function performs the following steps:
+      1. Establishes a connection to the database.
+      2. Looks for a record in the "context" table where user_id equals chat_id.
+      3. If a record is found, extracts the value of the context column, which should be a list.
+         If the list is empty or the value is missing, sets it as [new_message].
+         If the list is not empty, adds new_message to the end of the list.
+      4. If after adding, the list length exceeds 4 elements, keeps only the last 4 messages.
+      5. Updates the record in the database with the new list.
+      6. Closes the connection and logs the result.
       
-    Аргументы:
-      chat_id (int): Идентификатор пользователя/чата.
-      new_message (dict): Новое сообщение для добавления в историю (например, {"role": "user", "content": "Пример текста"}).
+    Arguments:
+      chat_id (int): User/chat identifier.
+      new_message (dict): New message to add to the history (e.g., {"role": "user", "content": "Example text"}).
     """
     global conn
     try:
-        # Запрос на получение текущей истории чата для заданного chat_id
+        # Query to get current chat history for the given chat_id
         query_select = "SELECT context FROM context WHERE user_id = $1 LIMIT 1;"
         row = await conn.fetchrow(query_select, chat_id)
         
         if row is not None:
-            # Извлекаем значение из колонки context; если значение None, используем пустой список
+            # Extract value from context column; if value is None, use empty list
             context_list = row["context"]
             if isinstance(context_list, str):
                 context_list = json.loads(context_list)
             #     context_list = []
         else:
-            # Если записи не существует, начинаем с пустого списка и создаём новую запись
+            # If record doesn't exist, start with empty list and create new record
             context_list = []
             query_insert = "INSERT INTO context (user_id, context) VALUES ($1, $2);"
             await conn.execute(query_insert, chat_id, json.dumps(context_list))
         
-        # Если список пуст, устанавливаем его как [new_message]
+        # If list is empty, set it as [new_message]
         if not context_list:
             context_list = [new_message]
         else:
-            # Иначе добавляем новое сообщение в конец списка
+            # Otherwise add new message to end of list
             context_list.append(new_message)
-            # Если длина списка превышает 4, оставляем только последние 4 элемента
+            # If list length exceeds 4, keep only last 4 elements
             if len(context_list) > 4:
                 context_list = context_list[-4:]
         
-        # Обновляем запись в таблице "context"
+        # Update record in "context" table
         query_update = "UPDATE context SET context = $2 WHERE user_id = $1;"
-        # Преобразуем список в JSON-строку для хранения в колонке типа JSON или text
+        # Convert list to JSON string for storage in JSON or text type column
         await conn.execute(query_update, chat_id, json.dumps(context_list))
         
-        await log_info(f"История чата для chat_id %s обновлена успешно, {chat_id}", type_e="info")
+        await log_info(f"Chat history for chat_id %s updated successfully, {chat_id}", type_e="info")
     except Exception as e:
-        await log_info(f"Ошибка обновления истории чата для chat_id %s: %s, {chat_id}, {e}", type_e="error")
+        await log_info(f"Error updating chat history for chat_id %s: %s, {chat_id}, {e}", type_e="error")
 
 async def clear_user_context(chat_id: int):
     """
-    Асинхронная функция для очистки контекста пользователя в таблице "context" PostgreSQL.
+    Asynchronous function for clearing a user's context in the "context" table of PostgreSQL.
     
-    Аргументы:
-      chat_id (int): Идентификатор пользователя, который ищется в колонке user_id.
+    Arguments:
+      chat_id (int): User identifier to be searched in the user_id column.
       
-    Если запись найдена, функция обновляет значение столбца context, устанавливая его пустым (например, пустой JSON-массив '[]'),
-    при этом значение в колонке user_id остается неизменным.
+    If the record is found, the function updates the value of the context column, setting it to empty (e.g., an empty JSON array '[]'),
+    while the value in the user_id column remains unchanged.
     """
     global conn
     try:
-        # Формируем запрос для обновления столбца context для заданного user_id
+        # Form query to update context column for given user_id
         query = "UPDATE context SET context = $2 WHERE user_id = $1;"
-        # Устанавливаем пустой контекст (пустой JSON-массив)
+        # Set empty context (empty JSON array)
         await conn.execute(query, chat_id, '[]')
         
-        await log_info(f"История чата для chat_id %s успешно очищена, {chat_id}", type_e="info")
+        await log_info(f"Chat history for chat_id %s cleared successfully, {chat_id}", type_e="info")
     except Exception as e:
-        await log_info(f"Ошибка очистки истории чата для chat_id %s: %s, {chat_id}, {e}", type_e="error")
+        await log_info(f"Error clearing chat history for chat_id %s: %s, {chat_id}, {e}", type_e="error")

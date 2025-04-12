@@ -9,7 +9,7 @@ async def init_logging():
     if _initialized:
         return
 
-    await asyncio.sleep(0)  # Для соблюдения асинхронного интерфейса
+    await asyncio.sleep(0)  # To maintain asynchronous interface
 
     logging.basicConfig(
         level=logging.INFO,

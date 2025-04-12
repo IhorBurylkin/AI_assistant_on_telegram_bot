@@ -10,7 +10,7 @@ from handlers.callbacks import callbacks_router
 from handlers.commands import commands_router
 
 async def set_commands():
-    # Команды для личных чатов
+    # Commands for private chats
     private_commands = [
         BotCommand(command="start", description="Launch the bot"),
         # BotCommand(command="settings", description="Change bot settings"),
@@ -18,7 +18,7 @@ async def set_commands():
         BotCommand(command="help", description="Info on working withe the bot")
     ]
     
-    # Команды для групповых чатов
+    # Commands for group chats
     group_commands = [
         BotCommand(command="start", description="Launch the bot"),
         BotCommand(command="help", description="Info on working withe the bot")
@@ -47,4 +47,4 @@ if __name__ == '__main__':
         tracemalloc.start()
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("Программа завершена пользователем")
+        print("Program terminated by user")

@@ -14,8 +14,8 @@ commands_router = Router()
 @commands_router.message(Command("start"))
 async def send_welcome(message: types.Message):
     try:
-        # Логирование получения команды
-        await log_info(f"Получена команда /start от пользователя {message.from_user.id}", type_e="info")
+        # Log command receipt
+        await log_info(f"Received /start command from user {message.from_user.id}", type_e="info")
         
         user_id = message.from_user.id
         chat_id = message.chat.id if message.chat.type == ChatType.PRIVATE else message.from_user.id
@@ -23,9 +23,9 @@ async def send_welcome(message: types.Message):
         lang = user_lang if user_lang in SUPPORTED_LANGUAGES else DEFAULT_LANGUAGES
         date_requests = datetime.date.fromisoformat("2025-03-09")
         
-        # Проверяем наличие пользователя
+        # Check user existence
         user_id_exists = await user_exists(user_id)
-        await log_info(f"Проверка существования пользователя {user_id}: {'найден' if user_id_exists else 'не найден'}", type_e="info")
+        await log_info(f"Checking existence of user {user_id}: {'found' if user_id_exists else 'not found'}", type_e="info")
         
         if user_id_exists == False:
             if user_id in WHITE_LIST:
@@ -54,33 +54,33 @@ async def send_welcome(message: types.Message):
                 "quality": "standard",
             }
             await write_user_to_json(USERS_FILE_PATH, user_data)
-            await log_info(f"Создан новый пользователь {user_id} с chat_id {chat_id}", type_e="info")
+            await log_info(f"Created new user {user_id} with chat_id {chat_id}", type_e="info")
             await send_info_msg(text=f'Type message: Info\nNew user: {user_data["username"]}\nUser ID: {user_data["user_id"]}', message_thread_id=LOGGING_SETTINGS_TO_SEND["message_thread_id"])
         
-        # Отправка сообщения в зависимости от типа чата
+        # Send message based on chat type
         if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
             remove_keyboard = ReplyKeyboardRemove()
             await message.reply(MESSAGES[lang]['welcome_group'], reply_markup=remove_keyboard)
-            await log_info(f"Отправлено приветственное сообщение в групповом чате {chat_id}", type_e="info")
+            await log_info(f"Sent welcome message in group chat {chat_id}", type_e="info")
         else:
             persistent_menu = await get_persistent_menu(chat_id)
             await message.reply(MESSAGES[lang]["welcome"], reply_markup=persistent_menu)
-            await log_info(f"Отправлено приветственное сообщение в приватном чате {chat_id}", type_e="info")
+            await log_info(f"Sent welcome message in private chat {chat_id}", type_e="info")
     except Exception as e:
-        await log_info(f"Ошибка в send_welcome: {e}", type_e="error")
+        await log_info(f"Error in send_welcome: {e}", type_e="error")
         raise
 
 @commands_router.message(Command("setmodel"))
 async def cmd_set_model(message: types.Message):
     try:
-        # Определяем chat_id в зависимости от типа чата
+        # Determine chat_id based on chat type
         chat_id = message.chat.id if message.chat.type == ChatType.PRIVATE else message.from_user.id
 
-        # Получаем язык пользователя и статус web_enabled
+        # Get user's language and web_enabled status
         user_data = await read_user_all_data(chat_id)
         lang = user_data.get("language")
         web_enabled = user_data.get("web_enabled")
-        # Если язык не найден, используем значение по умолчанию (например, "en")
+        # If language not found, use default value (e.g., "en")
         if not lang:
             lang = DEFAULT_LANGUAGES
 
@@ -103,7 +103,7 @@ async def cmd_set_model(message: types.Message):
             elif CHATGPT_MODEL == "gpt-4o":
                 CHATGPT_MODEL = "gpt-4o-search-preview"
 
-        await log_info(f"Модель ChatGPT изменена на: {CHATGPT_MODEL}", type_e="info")
+        await log_info(f"ChatGPT model changed to: {CHATGPT_MODEL}", type_e="info")
 
         if message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
             await message.reply(
@@ -112,50 +112,50 @@ async def cmd_set_model(message: types.Message):
             )
         await update_user_data(chat_id, "model", CHATGPT_MODEL)
     except Exception as e:
-        await log_info(f"Ошибка в cmd_set_model: {e}", type_e="error")
+        await log_info(f"Error in cmd_set_model: {e}", type_e="error")
         raise
 
 @commands_router.message(Command("settings"))
 async def command_settings(message: types.Message):
     try:
-        # Определяем chat_id: в приватном чате берем message.chat.id, иначе - message.from_user.id
+        # Determine chat_id: in private chat use message.chat.id, otherwise - message.from_user.id
         chat_id = message.chat.id if message.chat.type == ChatType.PRIVATE else message.from_user.id
         
-        # Получаем inline-меню настроек для данного пользователя
+        # Get inline settings menu for this user
         inline_menu = await get_settings_inline(chat_id)
         
-        # Читаем язык пользователя; если не найден, используем значение по умолчанию
+        # Read user's language; if not found, use default value
         user_data = await read_user_all_data(chat_id)
         lang = user_data.get("language")
         if not lang:
             lang = DEFAULT_LANGUAGES
         
-        # Если чат не является групповым, отправляем сообщение с меню настроек
+        # If chat is not a group, send message with settings menu
         if message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
             await message.answer(MESSAGES[lang]['settings_title'], reply_markup=inline_menu)
         
-        await log_info(f"Меню настроек отправлено для пользователя {chat_id}", type_e="info")
+        await log_info(f"Settings menu sent for user {chat_id}", type_e="info")
     except Exception as e:
-        await log_info(f"Ошибка в command_settings: {e}", type_e="error")
+        await log_info(f"Error in command_settings: {e}", type_e="error")
         raise
 
 @commands_router.message(Command("clearcontext"))
 async def command_clear_context(message: types.Message):
     try:
-        # Определяем chat_id в зависимости от типа чата
+        # Determine chat_id based on chat type
         chat_id = message.chat.id if message.chat.type == ChatType.PRIVATE else message.from_user.id
         
-        # Получаем язык пользователя; если язык не найден, используем значение по умолчанию
+        # Get user's language; if language not found, use default value
         user_data = await read_user_all_data(chat_id)
         lang = user_data.get("language")
         if not lang:
             lang = DEFAULT_LANGUAGES
 
-        # Очищаем контекст пользователя в файле JSON
+        # Clear user's context in JSON file
         await clear_user_context(chat_id)
-        await log_info(f"Контекст для пользователя {chat_id} успешно очищен.", type_e="info")
+        await log_info(f"Context for user {chat_id} successfully cleared.", type_e="info")
         
-        # Отправляем подтверждающее сообщение для приватных чатов
+        # Send confirmation message for private chats
         if message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
             persistent_menu = await get_persistent_menu(chat_id)
             await message.answer(
@@ -164,27 +164,27 @@ async def command_clear_context(message: types.Message):
                 parse_mode=ParseMode.HTML
             )
     except Exception as e:
-        await log_info(f"Ошибка в command_clear_context: {e}", type_e="error")
+        await log_info(f"Error in command_clear_context: {e}", type_e="error")
         raise
 
 @commands_router.message(Command("limits"))
 async def command_limits(message: types.Message):
     try:
-        # Вычисляем время до полуночи
+        # Calculate time until midnight
         remaining_time = await time_until_midnight_utc()
         total_seconds = int(remaining_time.total_seconds())
         hours, remainder = divmod(total_seconds, 3600)
         minutes, _ = divmod(remainder, 60)
         formatted_time = f"{hours:02d}:{minutes:02d}"
 
-        # Определяем chat_id и получаем язык пользователя
+        # Determine chat_id and get user's language
         chat_id = message.chat.id if message.chat.type == ChatType.PRIVATE else message.from_user.id
         user_data = await read_user_all_data(chat_id)
         lang = user_data.get("language")
         if not lang:
             lang = DEFAULT_LANGUAGES
 
-        # Получаем количество запросов и токенов, список лимитов и категорию
+        # Get number of requests and tokens, list of limits and category
         tokens = user_data.get("tokens")
         requests = user_data.get("requests")
         which_list = user_data.get("in_limit_list")
@@ -192,7 +192,7 @@ async def command_limits(message: types.Message):
         lost_req = LIMITS[which_list][0] - requests
         lost_tokens = LIMITS[which_list][1] - tokens
 
-        # Формируем сообщение с лимитами
+        # Form message with limits
         if chat_id in WHITE_LIST:
             message_to_send = (
                 f"{MESSAGES[lang]['limits'].format(lost_req, lost_tokens, formatted_time)}\n\n"
@@ -201,31 +201,31 @@ async def command_limits(message: types.Message):
         else:
             message_to_send = MESSAGES[lang]['limits'].format(lost_req, lost_tokens, formatted_time)
 
-        # Отправляем сообщение в зависимости от типа чата
+        # Send message based on chat type
         if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
             await message.answer(message_to_send)
         else:
             persistent_menu = await get_persistent_menu(chat_id)
             await message.answer(message_to_send, reply_markup=persistent_menu)
 
-        await log_info(f"Команда /limits успешно выполнена для chat_id {chat_id}", type_e="info")
+        await log_info(f"Command /limits successfully executed for chat_id {chat_id}", type_e="info")
     except Exception as e:
-        await log_info(f"Ошибка в command_limits: {e}", type_e="error")
+        await log_info(f"Error in command_limits: {e}", type_e="error")
         raise
 
 @commands_router.message(Command("help"))
 async def command_help(message: types.Message):
     try:
-        # Определяем chat_id в зависимости от типа чата
+        # Determine chat_id based on chat type
         chat_id = message.chat.id if message.chat.type == ChatType.PRIVATE else message.from_user.id
         
-        # Получаем язык пользователя; если не найден, используем значение по умолчанию
+        # Get user's language; if not found, use default value
         user_data = await read_user_all_data(chat_id)
         lang = user_data.get("language")
         if not lang:
             lang = DEFAULT_LANGUAGES
 
-        # Отправляем сообщение в зависимости от типа чата
+        # Send message based on chat type
         if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
             remove_keyboard = ReplyKeyboardRemove()
             await message.reply(MESSAGES[lang]['help_group'], reply_markup=remove_keyboard)
@@ -233,77 +233,77 @@ async def command_help(message: types.Message):
             persistent_menu = await get_persistent_menu(chat_id)
             await message.answer(MESSAGES[lang]['help'], reply_markup=persistent_menu)
         
-        await log_info(f"Команда /help успешно выполнена для chat_id {chat_id}", type_e="info")
+        await log_info(f"Command /help successfully executed for chat_id {chat_id}", type_e="info")
     except Exception as e:
-        await log_info(f"Ошибка в command_help: {e}", type_e="error")
+        await log_info(f"Error in command_help: {e}", type_e="error")
         raise
 
 @commands_router.message(lambda message: message.text in [MESSAGES[lang]["settings_title"] for lang in SUPPORTED_LANGUAGES])
 async def command_settings_reply_kb(message: types.Message):
     try:
-        # Определяем chat_id в зависимости от типа чата
+        # Determine chat_id based on chat type
         chat_id = message.chat.id if message.chat.type == ChatType.PRIVATE else message.from_user.id
 
-        # Получаем inline-меню настроек для данного пользователя
+        # Get inline settings menu for this user
         inline_menu = await get_settings_inline(chat_id)
 
-        # Получаем язык пользователя; если не найден, используем значение по умолчанию
+        # Get user's language; if not found, use default value
         user_data = await read_user_all_data(chat_id)
         lang = user_data.get("language")
         if not lang:
             lang = DEFAULT_LANGUAGES
 
-        # Отправляем сообщение с меню настроек в приватных чатах
+        # Send message with settings menu in private chats
         if message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
             await message.answer(MESSAGES[lang]['settings_title'], reply_markup=inline_menu)
 
-        await log_info(f"Команда settings успешно выполнена для chat_id {chat_id}", type_e="info")
+        await log_info(f"Command settings successfully executed for chat_id {chat_id}", type_e="info")
     except Exception as e:
-        await log_info(f"Ошибка в command_settings: {e}", type_e="error")
+        await log_info(f"Error in command_settings: {e}", type_e="error")
         raise
 
 @commands_router.message(lambda message: message.text in [MESSAGES[lang]["reply_kb"]["options"] for lang in SUPPORTED_LANGUAGES])
 async def command_options(message: types.Message):
     try:
-        # Определяем chat_id в зависимости от типа чата
+        # Determine chat_id based on chat type
         chat_id = message.chat.id if message.chat.type == ChatType.PRIVATE else message.from_user.id
 
-        # Получаем язык пользователя; если не найден, используем значение по умолчанию
+        # Get user's language; if not found, use default value
         user_data = await read_user_all_data(chat_id)
         lang = user_data.get("language")
         if not lang:
             lang = DEFAULT_LANGUAGES
 
-        # Получаем inline-меню настроек для данного пользователя
+        # Get inline settings menu for this user
         inline_menu = await get_options_inline(chat_id)
 
-        # Отправляем сообщение с меню настроек в приватных чатах
+        # Send message with settings menu in private chats
         if message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
             await message.answer(MESSAGES[lang]['inline_kb']['options']['options_title'], reply_markup=inline_menu)
         
-        await log_info(f"Команда options успешно выполнена для chat_id {chat_id}", type_e="info")
+        await log_info(f"Command options successfully executed for chat_id {chat_id}", type_e="info")
     except Exception as e:
-        await log_info(f"Ошибка в command_options: {e}", type_e="error")
+        await log_info(f"Error in command_options: {e}", type_e="error")
         raise
 
 @commands_router.message(lambda message: message.text in [MESSAGES[lang]["reply_kb"]["profile"] for lang in SUPPORTED_LANGUAGES])
 async def command_profile(message: types.Message):
     try:
-        # Определяем chat_id
+        # Determine chat_id
         chat_id = message.chat.id if message.chat.type == ChatType.PRIVATE else message.from_user.id
 
-        # Получаем данные пользователя: язык, статус web_enabled и модель
+        # Get user data: language, web_enabled status and model
         user_data = await read_user_all_data(chat_id)
         lang = user_data.get("language")
         if not lang:
             lang = DEFAULT_LANGUAGES
         
-        # Получаем inline-меню профиля для данного пользователя
+        # Get inline profile menu for this user
         inline_menu = await get_profile_inline(chat_id)
-        # Отправляем сообщение с меню профиля в приватных чатах
+        # Send message with profile menu in private chats
         if message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
             await message.answer(MESSAGES[lang]['inline_kb']['profile']['profile_title'], reply_markup=inline_menu)
-        await log_info(f"Команда profile успешно выполнена для chat_id {chat_id}", type_e="info")
+        await log_info(f"Command profile successfully executed for chat_id {chat_id}", type_e="info")
     except Exception as e:
-        await log_info(f"Ошибка в command_profile: {e}", type_e="error")
+        await log_info(f"Error in command_profile: {e}", type_e="error")
         raise
