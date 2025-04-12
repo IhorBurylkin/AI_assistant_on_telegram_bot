@@ -19,13 +19,22 @@ from config import DEFAULT_LANGUAGES, SUPPORTED_EXTENSIONS, SUPPORTED_IMAGE_EXTE
 from logs import log_info
 
 
-async def handle_message(message: types.Message, generation_type: str = None):
+async def handle_message(message: types.Message, generation_type: str = None, bot_instance=None):
     """
     Unified function for processing incoming messages.
     Preserves original logic, adds asynchronous logging through log_info,
     protects code with try/except blocks and ensures proper cleanup of temporary files.
+    
+    Args:
+        message: The message to process
+        generation_type: Optional type of generation (image or check)
+        bot_instance: Bot instance to use for file operations
     """
     try:
+        # Get bot instance from message if not provided
+        if bot_instance is None:
+            bot_instance = message.bot
+            
         # Determine chat_id based on chat type
         chat_id = message.chat.id if message.chat.type == ChatType.PRIVATE else message.from_user.id
         await log_info(f"Starting processing message from chat {chat_id}", type_e="info")
@@ -63,8 +72,8 @@ async def handle_message(message: types.Message, generation_type: str = None):
                 user_id = message.from_user.id
                 ogg_file = f"{user_id}.ogg"
                 wav_file = f"{user_id}.wav"
-                file_info = await message.bot.get_file(message.voice.file_id)
-                await message.bot.download_file(file_info.file_path, destination=ogg_file)
+                file_info = await bot_instance.get_file(message.voice.file_id)
+                await bot_instance.download_file(file_info.file_path, destination=ogg_file)
                 await log_info(f"Voice file downloaded for {chat_id}", type_e="info")
 
                 # Convert OGG -> WAV
@@ -95,7 +104,7 @@ async def handle_message(message: types.Message, generation_type: str = None):
                     )
                     return
                 image_path = f"{chat_id}_image.jpg"
-                await download_photo(message.photo[-1], image_path)
+                await download_photo(message.photo[-1], image_path, bot=bot_instance)
                 await log_info(f"Photo successfully uploaded for {chat_id} to {image_path}", type_e="info")
                 # Can add image text recognition
             except Exception as e:
@@ -121,8 +130,8 @@ async def handle_message(message: types.Message, generation_type: str = None):
                     )
                     return
                 image_path = f"{chat_id}_image.jpg"
-                file_info = await message.bot.get_file(document.file_id)
-                downloaded_file = await message.bot.download_file(file_info.file_path)
+                file_info = await bot_instance.get_file(document.file_id)
+                downloaded_file = await bot_instance.download_file(file_info.file_path)
                 with open(image_path, "wb") as new_file:
                     # If downloaded_file is BytesIO, extract bytes with getvalue()
                     if hasattr(downloaded_file, "getvalue"):
@@ -139,8 +148,8 @@ async def handle_message(message: types.Message, generation_type: str = None):
 
                 local_file = f"{chat_id}_{file_name}"
                 try:
-                    file_info = await message.bot.get_file(document.file_id)
-                    await message.bot.download_file(file_info.file_path, destination=local_file)
+                    file_info = await bot_instance.get_file(document.file_id)
+                    await bot_instance.download_file(file_info.file_path, destination=local_file)
                     parsed = await asyncio.to_thread(parser.from_file, local_file)
                     user_text = parsed.get("content", "").strip()
                     if not user_text:

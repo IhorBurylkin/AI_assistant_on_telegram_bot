@@ -43,7 +43,7 @@ async def get_options_inline(chat_id: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['clear_context'], callback_data="options:clear_context")],
         [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['generate_image'], callback_data="options:generate_image")],
-        #[InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['add_check'], callback_data="options:add_check")],
+        [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['add_check'], callback_data="options:add_check")],
         [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['close'], callback_data="settings:close")]
     ])
     await log_info(f"Inline options menu successfully created for user {chat_id}", type_e="info")

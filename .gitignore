@@ -183,6 +183,3 @@ white_list.json
 
 # PyPI configuration file
 .pypirc
-
-# gitignore file
-.gitignore

@@ -11,18 +11,25 @@ from concurrent.futures import ThreadPoolExecutor
 from logs import log_info
 from config import WHITE_LIST
 from services.db_utils import update_user_data
-from bot import bot, info_bot
 from config import LOGGING_SETTINGS_TO_SEND
 
-async def send_info_msg(chat_id=LOGGING_SETTINGS_TO_SEND["chat_id"], text=None, message_thread_id=None):
+async def send_info_msg(text=None, message_thread_id=None, info_bot=None, chat_id=None):
     """
     Function for sending a message to the logging bot
     """
+    if chat_id is None:
+        chat_id = LOGGING_SETTINGS_TO_SEND["chat_id"]
+        
     try:
-        if LOGGING_SETTINGS_TO_SEND["permission"] and LOGGING_SETTINGS_TO_SEND["message_thread_id"] not in [None, 0]:
-            await info_bot.send_message(chat_id=chat_id, text=text, message_thread_id=LOGGING_SETTINGS_TO_SEND["message_thread_id"])
+        # Only proceed if we have a bot instance
+        if info_bot is not None:
+            if LOGGING_SETTINGS_TO_SEND["permission"] and LOGGING_SETTINGS_TO_SEND["message_thread_id"] not in [None, 0]:
+                await info_bot.send_message(chat_id=chat_id, text=text, message_thread_id=LOGGING_SETTINGS_TO_SEND["message_thread_id"])
+            else:
+                await info_bot.send_message(chat_id=chat_id, text=text)
         else:
-            await info_bot.send_message(chat_id=chat_id, text=text)
+            # Log that we couldn't send the message due to missing bot instance
+            print(f"Warning: Could not send info message - info_bot instance not provided")
     except Exception as e:
         await log_info(f"Error sending message: {e}", type_e="error")
 
@@ -124,13 +131,18 @@ async def resize_image(image_path: str, max_size: tuple = (512, 512)):
         await log_info(f"Error resizing image {image_path}: {e}", type_e="error")
         raise
 
-async def download_photo(photo: types.PhotoSize, file_path: str):
+async def download_photo(photo: types.PhotoSize, file_path: str, bot=None):
     """
     Function for downloading and processing a photo
     :param photo: Photo
     :param file_path: Path to save the file
+    :param bot: Bot instance to use for downloading
     """
     try:
+        if bot is None:
+            await log_info("Error: Bot instance not provided to download_photo", type_e="error")
+            raise ValueError("Bot instance required for download_photo")
+            
         file_info = await bot.get_file(photo.file_id)
         await bot.download_file(file_info.file_path, destination=file_path)
         await resize_image(file_path)
@@ -198,54 +210,6 @@ def process_receipt(image_path):
     equalized = clahe.apply(gray)
     cv2.imwrite("step_equalized.jpg", equalized)
 
-    # # 3. Perspective correction (alignment)
-    # edged = cv2.Canny(equalized, 50, 150)
-    # contours, _ = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    # contours = sorted(contours, key=cv2.contourArea, reverse=True)[:5]
-    # cv2.imwrite("step_edged.jpg", edged)
-
-    # receipt_contour = None
-    # for cnt in contours:
-    #     peri = cv2.arcLength(cnt, True)
-    #     approx = cv2.approxPolyDP(cnt, 0.02 * peri, True)
-    #     if len(approx) == 4:  # look for contour with four vertices (receipt)
-    #         receipt_contour = approx
-    #         break
-
-    # if receipt_contour is not None:
-    #     pts = receipt_contour.reshape(4, 2)
-    #     pts = order_points(pts)
-
-    #     # Calculate dimensions of future image
-    #     (tl, tr, br, bl) = pts
-    #     widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
-    #     widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
-    #     maxWidth = max(int(widthA), int(widthB))
-
-    #     heightA = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
-    #     heightB = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
-    #     maxHeight = max(int(heightA), int(heightB))
-
-    #     dst = np.array([
-    #         [0, 0],
-    #         [maxWidth - 1, 0],
-    #         [maxWidth - 1, maxHeight - 1],
-    #         [0, maxHeight - 1]], dtype="float32")
-            
-    #     M = cv2.getPerspectiveTransform(pts, dst)
-    #     warped = cv2.warpPerspective(equalized, M, (maxWidth, maxHeight))
-    # else:
-    #     # If receipt contour not found, continue with pre-processed image
-    #     warped = equalized
-
-    # 4. Remove noise and smooth (median filter)
-    # blurred = cv2.medianBlur(equalized, 5)
-    # cv2.imwrite("step_blurred.jpg", blurred)
-
-    # 5. Binarize image (Otsu method)
-    # ret, thresh = cv2.threshold(equalized, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    # cv2.imwrite("step_thresh.jpg", thresh)
-
     # 6. Final cropping to receipt boundaries
     contours, _ = cv2.findContours(equalized.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if contours:
@@ -292,7 +256,7 @@ async def process_and_save_receipt(image_path, output_path=None):
             
         return output_path
     except Exception as e:
-        await log_info(f"Error sending message: {e}", type_e="error")
+        await log_info(f"Error processing image: {e}", type_e="error")
         raise
 
 async def open_cv_image_processing(image_path):
