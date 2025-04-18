@@ -19,10 +19,10 @@
       --button-text: #ffffff;
       --error-color: #ff3333;
 
-      /* Размеры текстов и отступов */
+      /* Размеры текста и отступов */
       --label-size: 0.7rem;
       --input-font: 0.7rem;
-      --input-padding: 0.4rem;
+      --input-padding: 0.3rem;
       --group-gap: 0.7rem;
       --button-font: 0.7rem;
       --button-padding: 0.6rem;
@@ -45,7 +45,7 @@
       display: flex;
       flex-direction: column;
       align-items: stretch;
-      justify-content: center;
+      justify-content: flex-start;
       /* Добавляем вертикальный отступ сверху с учётом Safe Area */
       padding: calc(env(safe-area-inset-top) + var(--v-padding)) var(--h-padding) env(safe-area-inset-bottom) var(--h-padding);
       height: 100%;
@@ -54,12 +54,12 @@
     /* Форма занимает всю высоту контейнера */
     form { display: flex; flex-direction: column; width: 100%; height: 100%; }
     .form-group { margin-bottom: var(--group-gap); display: flex; flex-direction: column; }
-    /* Расширяем блок для товара, если остается свободное пространство */
+    /* Блок товара растягивается */
     #group-product { flex: 1; display: flex; flex-direction: column; }
-    #group-product input { flex: 1; }
+    #group-product textarea { flex: 1; }
 
     label { margin-bottom: 0.25rem; font-weight: bold; font-size: var(--label-size); color: var(--text-color); }
-    input, select {
+    input, select, textarea {
       padding: var(--input-padding);
       font-size: var(--input-font);
       background-color: var(--input-bg);
@@ -67,9 +67,10 @@
       border: 1px solid var(--input-border);
       border-radius: 0.4rem;
       width: 100%;
+      resize: none;
     }
-    input:valid, select:valid { border-color: var(--input-valid); }
-    input:invalid, select:invalid { border-color: var(--input-invalid); }
+    input:valid, select:valid, textarea:valid { border-color: var(--input-valid); }
+    input:invalid, select:invalid, textarea:invalid { border-color: var(--input-invalid); }
     .error { color: var(--error-color); font-size: 0.75rem; display: none; }
     button {
       padding: var(--button-padding);
@@ -82,9 +83,13 @@
       margin-top: var(--group-gap);
     }
     button:active { opacity: 0.8; }
+    .hide-btn {
+      background: transparent;
+      color: var(--button-bg);
+      border: 1px solid var(--button-bg);
+    }
     @media (orientation: landscape) {
       .container {
-        /* Ландшафтный режим: сохраняем вертикальный отступ сверху */
         padding: calc(env(safe-area-inset-top) + var(--v-padding)) var(--h-padding);
       }
       form { flex-direction: row; flex-wrap: wrap; justify-content: space-between; height: auto; }
@@ -114,7 +119,7 @@
       </div>
       <div class="form-group" id="group-product">
         <label for="product">Наименование товара</label>
-        <input type="text" id="product" required minlength="2">
+        <textarea id="product" required minlength="2" rows="2" placeholder="Введите текст..."></textarea>
         <div class="error">Введите название товара.</div>
       </div>
       <div class="form-group">
@@ -132,6 +137,7 @@
         </select>
         <div class="error">Выберите валюту.</div>
       </div>
+      <button type="button" class="hide-btn" id="hideKeyboard">Свернуть клавиатуру</button>
       <button type="submit">Отправить</button>
     </form>
   </div>
@@ -149,15 +155,23 @@
       if (window.Telegram && Telegram.WebApp) {
         const tg = Telegram.WebApp;
         tg.ready();
-        // Переход в настоящий полноэкранный режим
-        if (tg.requestFullscreen) {
-          tg.requestFullscreen();
-        } else {
-          tg.expand();
-        }
+        if (tg.requestFullscreen) tg.requestFullscreen(); else tg.expand();
         const theme = tg.colorScheme || 'light';
         document.body.setAttribute('data-theme', theme);
       }
+
+      // Скрыть клавиатуру при клике вне полей
+      document.addEventListener('click', e => {
+        const tag = e.target.tagName.toLowerCase();
+        if (!['input','select','textarea','button','label'].includes(tag)) {
+          document.activeElement.blur();
+        }
+      });
+
+      // Кнопка "Свернуть клавиатуру"
+      document.getElementById('hideKeyboard').addEventListener('click', () => {
+        document.activeElement.blur();
+      });
 
       const form = document.getElementById('dataForm');
       const fields = ['date','time','store','product','total','currency'];
@@ -172,16 +186,12 @@
       form.addEventListener('submit', e => {
         e.preventDefault();
         let valid = true;
-        fields.forEach(id => {
-          if (!document.getElementById(id).checkValidity()) valid = false;
-        });
+        fields.forEach(id => { if (!document.getElementById(id).checkValidity()) valid = false; });
         if (!valid) return;
 
         const data = {};
         fields.forEach(id => data[id] = document.getElementById(id).value);
-        if (window.Telegram && Telegram.WebApp) {
-          Telegram.WebApp.sendData(JSON.stringify(data));
-        } else console.log(data);
+        if (window.Telegram && Telegram.WebApp) Telegram.WebApp.sendData(JSON.stringify(data)); else console.log(data);
       });
     });
   </script>
