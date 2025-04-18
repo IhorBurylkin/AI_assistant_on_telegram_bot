@@ -1,13 +1,10 @@
-import asyncio
 import telebot
-import threading
-import time
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.exceptions import TelegramConflictError
+from telebot.apihelper import ApiTelegramException
 from config.config import (
     TELEGRAM_BOT_TOKEN,
     TELEGRAM_INFO_BOT_TOKEN,
@@ -27,35 +24,23 @@ async def create_bot(token, parse_mode=ParseMode.HTML):
     session = AiohttpSession()
     return Bot(token=token, session=session, default=DefaultBotProperties(parse_mode=parse_mode))
 
-async def test_polling(token):
-    """Test if a token can be used for polling"""
-    temp_bot = None
+
+async def test_polling(token: str) -> bool:
+    # Простой вариант без потоков/процессов:
     try:
-        def start_polling():
-            try:
-                # Create temporary bot and session
-                temp_bot = telebot.TeleBot(token, parse_mode=ParseMode.HTML)
-                temp_bot.remove_webhook()
-                temp_bot.polling(non_stop=False, timeout=2, long_polling_timeout=2, logger_level=None)
-            except TelegramConflictError:
-                return
-            except Exception as e:
-                return
         await log_info(f"Testing token {token} for polling", type_e="info")
-        polling_thread = threading.Thread(target=start_polling, daemon=True)
-        polling_thread.start()
-        time.sleep(5)
-        if polling_thread.is_alive():
-            polling_thread.join()
-            await log_info(f"Token {token} is available for polling", type_e="info")
-            return True
-        else:
+        bot = telebot.TeleBot(token, parse_mode=ParseMode.HTML)
+        bot.remove_webhook()
+        bot.get_updates(limit=1, timeout=1)
+        await log_info(f"Token {token} is available for polling", type_e="info")
+        return True
+    except ApiTelegramException as e:
+        if e.error_code == 409:
+            await log_info(f"Token {token} has webhook conflict", type_e="warning")
             return False
-    except Exception as e:
-        if polling_thread:
-            polling_thread.join()
-        await log_info(f"Error testing polling: {e}", type_e="error")
-        return False
+        else:
+            await log_info(f"Error testing polling: {e}", type_e="error")
+            return False
 
 async def initialize_bots():
     """Initialize bots with direct polling test"""
