@@ -1,5 +1,5 @@
 import calendar
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from services.db_utils import read_user_all_data
 from config import DEFAULT_LANGUAGES, MESSAGES, MODELS, MODELS_FOR_MENU, LIMITS, WHITE_LIST, WEBAPP_URL
 from logs import log_info
@@ -272,8 +272,8 @@ async def get_add_check_inline(chat_id: int) -> InlineKeyboardMarkup:
         lang = DEFAULT_LANGUAGES
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['manual_entry'], web_app=WEBAPP_URL)],
-        InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['back'], callback_data="options:back")
+        [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['manual_entry'], web_app=WebAppInfo(url=WEBAPP_URL)),
+        InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['back'], callback_data="options:back")]
     ])
     await log_info(f"Inline add check menu successfully created for user {chat_id}", type_e="info")
     return kb
