@@ -101,17 +101,6 @@ async def initialize_bots():
 # which will call initialize_bots() directly
 async def _init_bots_globals():
     global bot, dp, info_bot, dp_info_bot
-    # Only initialize if not already done
-    if not bot or not info_bot:
-        try:
-            bot, dp, info_bot, dp_info_bot = await initialize_bots()
-        except Exception as e:
-            print(f"Warning: Failed to initialize bots at module level: {e}")
-
-# Create an event loop and run the initialization
-# This ensures the global variables are set for modules that import them directly
-async def _init_bots_globals():
-    global bot, dp, info_bot, dp_info_bot
     if not bot or not info_bot:
         try:
             bot, dp, info_bot, dp_info_bot = await initialize_bots()

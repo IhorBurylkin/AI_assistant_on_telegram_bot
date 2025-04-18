@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from config import DEFAULT_LANGUAGES, MESSAGES
 from services.db_utils import read_user_all_data
+from logs import log_info
 
 # Инициализация
 app = FastAPI()
@@ -25,6 +26,7 @@ async def form(request: Request, chat_id: int):
             }
         )
     except Exception as e:
+        await log_info(f"Error in webapp for chat_id {chat_id}: {e}", type_e="error")
         return HTMLResponse(f"<h1>Error</h1><p>{str(e)}</p>", status_code=500)
 
 if __name__ == "__main__":

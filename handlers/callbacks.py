@@ -3,7 +3,7 @@ from aiogram import types, Router, F
 from aiogram.enums import ChatType, ParseMode
 from services.db_utils import read_user_all_data, update_user_data, clear_user_context, update_checks_analytics_columns, write_user_to_json
 from services.utils import get_current_datetime, dict_to_str, map_keys, split_str_to_dict
-from config import MESSAGES, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGES, CHECKS_ANALYTICS
+from config import MESSAGES, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGES, CHECKS_ANALYTICS, CHATGPT_MODEL
 from aiogram.types import ForceReply
 from aiogram.fsm.context import FSMContext
 from io import BytesIO
@@ -190,8 +190,6 @@ async def process_options_callback(query: types.CallbackQuery, state: FSMContext
             await state.clear()
             #dict_for_db = await map_keys(message_to_db, chat_id, lang)
             list_of_dict_for_db = await map_keys(list_of_dict, chat_id, lang)
-            print("list_of_dict\n", list_of_dict)
-            print("list_of_dict_for_db\n", list_of_dict_for_db)
             for dict_to_db in list_of_dict_for_db:
                 #dict_for_db['product'] = await split_str_to_dict(dict_for_db['product'], split_only_line=True)
                 await write_user_to_json(CHECKS_ANALYTICS, dict_to_db)

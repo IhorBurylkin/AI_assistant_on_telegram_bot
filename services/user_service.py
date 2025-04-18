@@ -128,9 +128,7 @@ async def handle_message(message: types.Message, generation_type: str = None, bo
                         parse_mode=ParseMode.HTML
                     )
                     return
-                image_path = f"{chat_id}_image.jpg"
-                file_info = await bot_instance.get_file(document.file_id)
-                await handle_document(document, chat_id, bot_instance)
+                image_path = await handle_document(document, chat_id, bot_instance)
             else:
                 if not any(file_name.lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
                     await message.answer(
