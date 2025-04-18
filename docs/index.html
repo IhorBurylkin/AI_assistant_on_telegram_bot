@@ -158,13 +158,7 @@
         document.body.setAttribute('data-theme', theme);
       }
 
-      // Скрыть клавиатуру при клике вне полей
-      document.addEventListener('click', e => {
-        const tag = e.target.tagName.toLowerCase();
-        if (!['input','select','textarea','button','label'].includes(tag)) {
-          document.activeElement.blur();
-        }
-      });
+      
 
       const form = document.getElementById('dataForm');
       const fields = ['date','time','store','product','total','currency'];
