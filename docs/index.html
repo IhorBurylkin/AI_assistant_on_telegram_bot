@@ -20,13 +20,14 @@
       --error-color: #ff3333;
 
       /* Размеры текстов и отступов */
-      --label-size: 0.875rem;
-      --input-font: 0.875rem;
-      --input-padding: 0.5rem;
-      --group-gap: 0.75rem;
-      --button-font: 0.875rem;
-      --button-padding: 0.75rem;
+      --label-size: 0.7rem;
+      --input-font: 0.7rem;
+      --input-padding: 0.4rem;
+      --group-gap: 0.6rem;
+      --button-font: 0.7rem;
+      --button-padding: 0.6rem;
       --h-padding: 1rem; /* Горизонтальный отступ */
+      --v-padding: 3rem; /* Вертикальный отступ сверху */
     }
     [data-theme="dark"] {
       --bg-color: #1e1e1e;
@@ -45,7 +46,8 @@
       flex-direction: column;
       align-items: stretch;
       justify-content: center;
-      padding: env(safe-area-inset-top) var(--h-padding) env(safe-area-inset-bottom) var(--h-padding);
+      /* Добавляем вертикальный отступ сверху с учётом Safe Area */
+      padding: calc(env(safe-area-inset-top) + var(--v-padding)) var(--h-padding) env(safe-area-inset-bottom) var(--h-padding);
       height: 100%;
       width: 100%;
     }
@@ -81,7 +83,10 @@
     }
     button:active { opacity: 0.8; }
     @media (orientation: landscape) {
-      .container { padding: 0.5rem var(--h-padding); }
+      .container {
+        /* Ландшафтный режим: сохраняем вертикальный отступ сверху */
+        padding: calc(env(safe-area-inset-top) + var(--v-padding)) var(--h-padding);
+      }
       form { flex-direction: row; flex-wrap: wrap; justify-content: space-between; height: auto; }
       .form-group { width: 48%; }
       #group-product { width: 100%; flex: none; }
