@@ -49,8 +49,13 @@
       height: 100%;
       width: 100%;
     }
-    form { display: flex; flex-direction: column; width: 100%; }
+    /* Форма занимает всю высоту контейнера */
+    form { display: flex; flex-direction: column; width: 100%; height: 100%; }
     .form-group { margin-bottom: var(--group-gap); display: flex; flex-direction: column; }
+    /* Расширяем блок для товара, если остается свободное пространство */
+    #group-product { flex: 1; display: flex; flex-direction: column; }
+    #group-product input { flex: 1; }
+
     label { margin-bottom: 0.25rem; font-weight: bold; font-size: var(--label-size); color: var(--text-color); }
     input, select {
       padding: var(--input-padding);
@@ -77,8 +82,9 @@
     button:active { opacity: 0.8; }
     @media (orientation: landscape) {
       .container { padding: 0.5rem var(--h-padding); }
-      form { flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
+      form { flex-direction: row; flex-wrap: wrap; justify-content: space-between; height: auto; }
       .form-group { width: 48%; }
+      #group-product { width: 100%; flex: none; }
       button { width: 48%; align-self: center; }
     }
   </style>
@@ -101,7 +107,7 @@
         <input type="text" id="store" required minlength="2">
         <div class="error">Введите название магазина.</div>
       </div>
-      <div class="form-group">
+      <div class="form-group" id="group-product">
         <label for="product">Наименование товара</label>
         <input type="text" id="product" required minlength="2">
         <div class="error">Введите название товара.</div>
@@ -142,7 +148,6 @@
         if (tg.requestFullscreen) {
           tg.requestFullscreen();
         } else {
-          // fallback: просто расширяем на всю доступную высоту
           tg.expand();
         }
         const theme = tg.colorScheme || 'light';
