@@ -1,102 +1,122 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Форма ввода данных</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Форма данных</title>
   <style>
-    .field { margin-bottom: 1em; }
-    .field input {
-      width: 100%; padding: 0.5em; box-sizing: border-box;
-      border: 1px solid #ccc; border-radius: 4px;
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: sans-serif; }
+    .container { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; height: 100%; box-sizing: border-box; }
+    form { display: flex; flex-direction: column; width: 100%; max-width: 400px; }
+    .form-group { margin-bottom: 15px; display: flex; flex-direction: column; }
+    label { margin-bottom: 5px; font-weight: bold; }
+    input, select { padding: 10px; font-size: 1rem; border: 1px solid #ccc; border-radius: 5px; }
+    input:invalid, select:invalid { border-color: red; }
+    input:valid, select:valid { border-color: green; }
+    .error { color: red; font-size: 0.9rem; display: none; }
+    @media (orientation: landscape) {
+      form { flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
+      .form-group { width: 48%; }
     }
-    .field.valid input   { border-color: green; }
-    .field.invalid input { border-color: red;   }
-    .message {
-      display: block; margin-top: 0.2em; font-size: 0.9em;
-    }
-    .valid .message   { color: green; }
-    .invalid .message { color: red;   }
-    #buttons { display: flex; gap: 1em; margin-top: 1em; }
-    button {
-      padding: 0.5em 1em; border: none; border-radius: 4px;
-      cursor: pointer;
-    }
-    #accept-btn { background: #28a745; color: white; }
-    #close-btn  { background: #dc3545; color: white; }
   </style>
-</head>
-<body>
-  <!-- Подключаем Telegram WebApp SDK -->
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
-  <h2>Заполните форму</h2>
-  <div id="form-container">
-    {% for name in fields %}
-      <div class="field" id="field-{{ name }}">
-        <label>{{ name }}</label><br>
-        {% if name == "Дата" %}
-          <input type="date" id="input-{{ name }}" />
-        {% elif name == "Время" %}
-          <input type="time" id="input-{{ name }}" />
-        {% elif name == "Итого" %}
-          <input type="number" step="any" id="input-{{ name }}" />
-        {% else %}
-          <input type="text" id="input-{{ name }}" />
-        {% endif %}
-        <span class="message"></span>
-      </div>
-    {% endfor %}
-
-    <div id="buttons">
-      <button id="close-btn">{{ buttons.close }}</button>
-      <button id="accept-btn">{{ buttons.accept }}</button>
-    </div>
-  </div>
-
   <script>
-    const tg = window.Telegram.WebApp;
-    tg.expand();
+    window.addEventListener('DOMContentLoaded', () => {
+      // Инициализация Telegram WebApp
+      if (window.Telegram && Telegram.WebApp) {
+        Telegram.WebApp.init();
+        Telegram.WebApp.expand();
+      }
 
-    const FIELDS = {{ fields | tojson(ensure_ascii=False) }};
-    const acceptBtn = document.getElementById("accept-btn");
-    const closeBtn  = document.getElementById("close-btn");
+      const form = document.getElementById('dataForm');
+      const fields = ['date', 'time', 'store', 'product', 'total', 'currency'];
 
-    closeBtn.addEventListener("click", () => {
-      tg.close();
-    });
-
-    acceptBtn.addEventListener("click", () => {
-      let allValid = true;
-      const result = [];
-
-      FIELDS.forEach(name => {
-        const fieldDiv = document.getElementById(`field-${name}`);
-        const input    = document.getElementById(`input-${name}`);
-        const msg      = fieldDiv.querySelector(".message");
-        const value    = input.value.trim();
-
-        // Валидация
-        let valid = !!value;
-        if (valid && name === "Итого") {
-          valid = !isNaN(value);
-        }
-        // можно добавить проверку date/time, если нужно
-
-        fieldDiv.classList.toggle("valid", valid);
-        fieldDiv.classList.toggle("invalid", !valid);
-        msg.textContent = valid ? "valid" : "invalid";
-
-        if (!valid) allValid = false;
-        result.push({ [name]: value });
+      // Подключаем валидацию полей
+      fields.forEach(id => {
+        const input = document.getElementById(id);
+        input.addEventListener('input', () => validateField(input));
       });
 
-      if (allValid) {
-        // Отправляем данные боту и закрываем WebApp
-        tg.sendData(JSON.stringify(result));
-        tg.close();
+      function validateField(input) {
+        const error = input.nextElementSibling;
+        if (!input.checkValidity()) {
+          error.style.display = 'block';
+        } else {
+          error.style.display = 'none';
+        }
       }
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        let valid = true;
+        fields.forEach(id => {
+          const input = document.getElementById(id);
+          validateField(input);
+          if (!input.checkValidity()) valid = false;
+        });
+
+        if (valid) {
+          const data = fields.reduce((obj, id) => {
+            obj[id] = document.getElementById(id).value;
+            return obj;
+          }, {});
+
+          // Отправляем данные в бот через Telegram WebApp
+          if (window.Telegram && Telegram.WebApp) {
+            Telegram.WebApp.sendData(JSON.stringify(data));
+          } else {
+            console.log(data);
+          }
+        }
+      });
     });
   </script>
+</head>
+<body>
+  <div class="container">
+    <form id="dataForm" novalidate>
+      <div class="form-group">
+        <label for="date">Дата</label>
+        <input type="date" id="date" required>
+        <div class="error">Пожалуйста, выберите дату.</div>
+      </div>
+
+      <div class="form-group">
+        <label for="time">Время</label>
+        <input type="time" id="time" required>
+        <div class="error">Пожалуйста, выберите время.</div>
+      </div>
+
+      <div class="form-group">
+        <label for="store">Магазин</label>
+        <input type="text" id="store" required minlength="2">
+        <div class="error">Введите название магазина.</div>
+      </div>
+
+      <div class="form-group">
+        <label for="product">Наименование товара</label>
+        <input type="text" id="product" required minlength="2">
+        <div class="error">Введите название товара.</div>
+      </div>
+
+      <div class="form-group">
+        <label for="total">Итого</label>
+        <input type="number" id="total" required step="0.01" min="0">
+        <div class="error">Введите корректную сумму.</div>
+      </div>
+
+      <div class="form-group">
+        <label for="currency">Валюта</label>
+        <select id="currency" required>
+          <option value="">Выберите валюту</option>
+          <option value="RUB">RUB</option>
+          <option value="USD">USD</option>
+          <option value="EUR">EUR</option>
+        </select>
+        <div class="error">Выберите валюту.</div>
+      </div>
+
+      <button type="submit">Отправить</button>
+    </form>
+  </div>
 </body>
 </html>
