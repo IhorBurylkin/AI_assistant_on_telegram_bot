@@ -124,6 +124,7 @@
       <button type="submit">Отправить</button>
     </form>
   </div>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script>
     // Подстройка размера шрифта (уменьшаем масштаб для 6" экрана)
     function adjustFont() {
@@ -135,9 +136,16 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       if (window.Telegram && Telegram.WebApp) {
-        Telegram.WebApp.ready();
-        Telegram.WebApp.expand();
-        const theme = Telegram.WebApp.colorScheme || 'light';
+        const tg = Telegram.WebApp;
+        tg.ready();
+        // Переход в настоящий полноэкранный режим
+        if (tg.requestFullscreen) {
+          tg.requestFullscreen();
+        } else {
+          // fallback: просто расширяем на всю доступную высоту
+          tg.expand();
+        }
+        const theme = tg.colorScheme || 'light';
         document.body.setAttribute('data-theme', theme);
       }
 
