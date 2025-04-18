@@ -110,16 +110,13 @@ async def _init_bots_globals():
 
 # Create an event loop and run the initialization
 # This ensures the global variables are set for modules that import them directly
-try:
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(_init_bots_globals())
-except RuntimeError:
-    # Handle case where there's no running event loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(_init_bots_globals())
-except Exception as e:
-    print(f"Warning: Error during initial bot initialization: {e}")
+async def _init_bots_globals():
+    global bot, dp, info_bot, dp_info_bot
+    if not bot or not info_bot:
+        try:
+            bot, dp, info_bot, dp_info_bot = await initialize_bots()
+        except Exception as e:
+            print(f"Warning: Failed to initialize bots at module level: {e}")
     
     # Fallback initialization for global variables if everything fails
     if not bot:

@@ -7,7 +7,7 @@ from aiogram import types
 from aiogram.enums import ParseMode, ChatType
 from aiogram.types import ReplyKeyboardRemove
 from services.openai_api import generate_ai_response
-from services.utils import download_photo, convert_audio, count_tokens_for_user_text, check_user_limits, split_str_to_dict, parse_ai_result_response
+from services.utils import download_photo, handle_document, convert_audio, count_tokens_for_user_text, check_user_limits, split_str_to_dict, parse_ai_result_response
 from services.db_utils import (
     read_user_all_data,
     update_user_data,
@@ -130,13 +130,7 @@ async def handle_message(message: types.Message, generation_type: str = None, bo
                     return
                 image_path = f"{chat_id}_image.jpg"
                 file_info = await bot_instance.get_file(document.file_id)
-                downloaded_file = await bot_instance.download_file(file_info.file_path)
-                with open(image_path, "wb") as new_file:
-                    # If downloaded_file is BytesIO, extract bytes with getvalue()
-                    if hasattr(downloaded_file, "getvalue"):
-                        new_file.write(downloaded_file.getvalue())
-                    else:
-                        new_file.write(downloaded_file)
+                await handle_document(document, chat_id, bot_instance)
             else:
                 if not any(file_name.lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
                     await message.answer(

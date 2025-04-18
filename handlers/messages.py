@@ -1,7 +1,8 @@
 import json
 from aiogram import types, F, Router
 from aiogram.enums import ChatType, ParseMode
-from aiogram.types import WebAppInfo, ContentType
+from aiogram.enums.content_type import ContentType
+from aiogram.types import Message
 from services.db_utils import update_user_data, read_user_all_data
 from config import BOT_USERNAME, DEFAULT_LANGUAGES
 from handlers.callbacks import get_persistent_menu
@@ -78,8 +79,8 @@ async def group_message_handler(message: types.Message):
         await log_info(f"Error in group_message_handler for chat {message.chat.id}: {e}", type_e="error")
         raise
 
-@messages_router.message(ContentType.WEB_APP_DATA)
-async def web_app_data_handler(message: types.Message):
+@messages_router.message(F.content_type == ContentType.WEB_APP_DATA)
+async def handle_web_app_data(message: Message):
     try:
         raw = message.web_app_data.data
         data = json.loads(raw)

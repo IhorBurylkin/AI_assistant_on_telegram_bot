@@ -1,5 +1,6 @@
 import tiktoken
 import asyncio
+import aiofiles
 import datetime
 from PIL import Image
 from aiogram import types
@@ -175,6 +176,33 @@ async def get_current_datetime():
     """
     await asyncio.sleep(0)  # This makes the function awaitable in an async context
     return datetime.now(timezone.utc)
+
+async def handle_document(document, chat_id, bot_instance):
+    """
+    Handles the document sent by the user.
+    Downloads the document and saves it to a specified path.
+    :param document: Document object from Telegram
+    :param chat_id: ID of the chat where the document was sent
+    :param bot_instance: Bot instance to use for downloading
+    :return: Path to the saved document
+    """
+    image_path = f"{chat_id}_image.jpg"
+    try:
+        file_info = await bot_instance.get_file(document.file_id)
+        downloaded_file = await bot_instance.download_file(file_info.file_path)
+        
+        async with aiofiles.open(image_path, "wb") as new_file:
+            if hasattr(downloaded_file, "getvalue"):
+                await new_file.write(downloaded_file.getvalue())
+                await log_info(f"Document successfully downloaded: {image_path}", type_e="info")
+            else:
+                await new_file.write(downloaded_file)
+        return image_path
+    except Exception as e:
+        await log_info(f"Error downloading document: {e}", type_e="error")
+        if os.path.exists(image_path):
+            os.remove(image_path)
+        raise
 
 def order_points(pts):
     """

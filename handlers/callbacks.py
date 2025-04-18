@@ -35,6 +35,10 @@ callbacks_router = Router()
 message_to_db = {}
 list_of_dict = []
 
+class CheckState(StatesGroup):
+    waiting_for_input = State()
+    check_data = State()
+
 class PromptState(StatesGroup):
     waiting_for_input = State()
 

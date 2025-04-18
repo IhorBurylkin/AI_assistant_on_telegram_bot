@@ -1,5 +1,6 @@
 import asyncio
 import tracemalloc
+import contextlib
 from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats, BotCommandScopeAllGroupChats
 from bot_instance import initialize_bots  # Updated import
 from keyboards import inline_kb, reply_kb
@@ -29,14 +30,22 @@ async def set_commands(bot):
     await bot.set_my_commands(private_commands, scope=BotCommandScopeAllPrivateChats())
     await bot.set_my_commands(group_commands, scope=BotCommandScopeAllGroupChats())
 
+@contextlib.asynccontextmanager
+async def database_connection():
+    try:
+        await create_connection()
+        yield
+    finally:
+        await close_connection()
+
 async def main():
     try:
         # Initialize bots with redundancy check
         bot, dp, info_bot, info_dp = await initialize_bots()
         
         # Initialize database
-        await create_connection()
-        await init_db_tables()
+        async with database_connection():
+            await init_db_tables()
         
         # Set commands for the main bot
         await set_commands(bot)

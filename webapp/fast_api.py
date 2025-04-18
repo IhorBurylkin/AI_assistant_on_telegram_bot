@@ -10,24 +10,22 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-@app.get("/form", response_class=HTMLResponse)
-async def form(request: Request):
-    user_data = await read_user_all_data(chat_id)
-    lang = user_data.get("language")
-    if not lang:
-        lang = DEFAULT_LANGUAGES
-    """
-    Отдаёт страницу с формой.
-    Динамически вставляются поля и кнопки из config.json.
-    """
-    return templates.TemplateResponse(
-        "form.html",
-        {
-            "request":  request,
-            "fields":   MESSAGES[lang]["check_struckture_data"],
-            "buttons":  MESSAGES[lang]["web_app_bt"],
-        }
-    )
+@app.get("/form/{chat_id}", response_class=HTMLResponse)
+async def form(request: Request, chat_id: int):
+    try:
+        user_data = await read_user_all_data(chat_id)
+        lang = user_data.get("language") if user_data else DEFAULT_LANGUAGES
+        
+        return templates.TemplateResponse(
+            "form.html",
+            {
+                "request": request,
+                "fields": MESSAGES[lang]["check_struckture_data"],
+                "buttons": MESSAGES[lang]["web_app_bt"],
+            }
+        )
+    except Exception as e:
+        return HTMLResponse(f"<h1>Error</h1><p>{str(e)}</p>", status_code=500)
 
 if __name__ == "__main__":
     import uvicorn

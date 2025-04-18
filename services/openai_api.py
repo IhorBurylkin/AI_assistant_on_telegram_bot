@@ -1,7 +1,7 @@
 import openai
 import base64
 import google.generativeai as genai
-from config import OPENAI_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY, MODELS
+from config import OPENAI_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY, GOOGLE_CREDENTIALS_PATH, MODELS
 from logs import log_info
 import aiofiles
 import io
@@ -13,7 +13,7 @@ from google.protobuf.json_format import MessageToDict
 from services.utils import open_cv_image_processing
 
 # Set environment variable if not configured
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/home/user/Projects/keys/google/api_i.burilkin.json'
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = GOOGLE_CREDENTIALS_PATH
 
 async def generate_ai_response(user_model, set_answer=None, web_enabled=None, content_type=None, conversation=None, image_path=None, size=None, quality=None) -> str:
     """

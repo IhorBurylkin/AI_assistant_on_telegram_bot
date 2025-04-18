@@ -109,6 +109,12 @@ async def init_db_tables():
         await log_info(f"Error initializing tables: %s, {e}", type_e="error")
         raise
 
+def validate_identifier(name):
+    """Validate SQL identifier (table/column name)"""
+    if not name or not isinstance(name, str) or not all(c.isalnum() or c == '_' for c in name):
+        raise ValueError(f"Invalid SQL identifier: {name}")
+    return name
+
 async def user_exists(user_id: int) -> bool:
     """
     Asynchronous function to check if user_id exists in the PostgreSQL database.
@@ -315,6 +321,7 @@ async def update_user_data(chat_id: int, key: str, value):
         # Form SQL query for update. 
         # Note: column name (key) cannot be parameterized, so it's assumed
         # that the key value is safe and valid.
+        validate_identifier(key)
         query = f"UPDATE chat_ids SET {key} = $2 WHERE user_id = $1;"
         
         # Execute query. The execute method will return a string like "UPDATE <n>" on successful update.
