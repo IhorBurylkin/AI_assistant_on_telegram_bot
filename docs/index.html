@@ -18,12 +18,15 @@
       --button-bg: #2a86ff;
       --button-text: #ffffff;
       --error-color: #ff3333;
+
+      /* Размеры текстов и отступов */
       --label-size: 0.875rem;
       --input-font: 0.875rem;
       --input-padding: 0.5rem;
       --group-gap: 0.75rem;
       --button-font: 0.875rem;
       --button-padding: 0.75rem;
+      --h-padding: 1rem; /* Горизонтальный отступ */
     }
     [data-theme="dark"] {
       --bg-color: #1e1e1e;
@@ -37,25 +40,43 @@
       --error-color: #ff6666;
     }
     body { background-color: var(--bg-color); color: var(--text-color); }
-    .container { display: flex; flex-direction: column; align-items: stretch; justify-content: center;
-      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-      height: 100%; width: 100%; }
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: center;
+      padding: env(safe-area-inset-top) var(--h-padding) env(safe-area-inset-bottom) var(--h-padding);
+      height: 100%;
+      width: 100%;
+    }
     form { display: flex; flex-direction: column; width: 100%; }
     .form-group { margin-bottom: var(--group-gap); display: flex; flex-direction: column; }
     label { margin-bottom: 0.25rem; font-weight: bold; font-size: var(--label-size); color: var(--text-color); }
     input, select {
-      padding: var(--input-padding); font-size: var(--input-font); background-color: var(--input-bg);
-      color: var(--text-color); border: 1px solid var(--input-border); border-radius: 0.4rem; width: 100%; }
+      padding: var(--input-padding);
+      font-size: var(--input-font);
+      background-color: var(--input-bg);
+      color: var(--text-color);
+      border: 1px solid var(--input-border);
+      border-radius: 0.4rem;
+      width: 100%;
+    }
     input:valid, select:valid { border-color: var(--input-valid); }
     input:invalid, select:invalid { border-color: var(--input-invalid); }
     .error { color: var(--error-color); font-size: 0.75rem; display: none; }
     button {
-      padding: var(--button-padding); font-size: var(--button-font); border: none; border-radius: 0.4rem;
-      background-color: var(--button-bg); color: var(--button-text); cursor: pointer; margin-top: var(--group-gap);
+      padding: var(--button-padding);
+      font-size: var(--button-font);
+      border: none;
+      border-radius: 0.4rem;
+      background-color: var(--button-bg);
+      color: var(--button-text);
+      cursor: pointer;
+      margin-top: var(--group-gap);
     }
     button:active { opacity: 0.8; }
     @media (orientation: landscape) {
-      .container { padding: 0.5rem; }
+      .container { padding: 0.5rem var(--h-padding); }
       form { flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
       .form-group { width: 48%; }
       button { width: 48%; align-self: center; }
