@@ -177,6 +177,7 @@ chat_ids.json
 client_secret.json
 context.json
 white_list.json
+bot_instance.lock
 
 # Image files
 .jpg

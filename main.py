@@ -2,7 +2,7 @@ import asyncio
 import tracemalloc
 import contextlib
 from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats, BotCommandScopeAllGroupChats
-from bot_instance import initialize_bots  # Updated import
+from bot_instance import initialize_bots
 from keyboards import inline_kb, reply_kb
 from services.db_utils import init_db_tables
 from services.db_utils import create_connection, close_connection
@@ -47,25 +47,23 @@ async def main():
         async with database_connection():
             await init_db_tables()
         
-        # Set commands for the main bot
-        await set_commands(bot)
-        
-        # Include routers for the main bot
-        dp.include_router(commands_router)
-        dp.include_router(callbacks_router)
-        dp.include_router(messages_router)
-        
-        # Start polling for both bots
-        await log_info("Starting bot polling", type_e="info")
-        await asyncio.gather(
-            dp.start_polling(bot),
-            info_dp.start_polling(info_bot)
-        )
+            # Set commands for the main bot
+            await set_commands(bot)
+            
+            # Include routers for the main bot
+            dp.include_router(commands_router)
+            dp.include_router(callbacks_router)
+            dp.include_router(messages_router)
+            
+            # Start polling for both bots
+            await log_info("Starting bot polling", type_e="info")
+            await asyncio.gather(
+                dp.start_polling(bot),
+                info_dp.start_polling(info_bot)
+            )
     except Exception as e:
         print(f"Error in main function: {e}")
         raise
-    finally:
-        await close_connection()
 
 if __name__ == '__main__':
     try:

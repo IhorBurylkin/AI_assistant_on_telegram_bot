@@ -272,7 +272,8 @@ async def get_add_check_inline(chat_id: int) -> InlineKeyboardMarkup:
         lang = DEFAULT_LANGUAGES
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['back'], callback_data="options:back")]
+        [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['manual_entry'], web_app=WEBAPP_URL)],
+        InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['back'], callback_data="options:back")
     ])
     await log_info(f"Inline add check menu successfully created for user {chat_id}", type_e="info")
     return kb
@@ -300,7 +301,7 @@ async def get_continue_add_check_accept_inline(chat_id: int) -> InlineKeyboardMa
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅", callback_data="options:add_check:"),
-        InlineKeyboardButton(text="📝", web_app=WEBAPP_URL),
+        #InlineKeyboardButton(text="📝", web_app=WEBAPP_URL),
         InlineKeyboardButton(text="❌", callback_data="options:close")],
     ])
     await log_info(f"Inline continue check confirmation menu successfully created for user {chat_id}", type_e="info")
