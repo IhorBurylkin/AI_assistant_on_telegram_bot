@@ -1,5 +1,7 @@
 import asyncio
 import telebot
+import threading
+import time
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.session.aiohttp import AiohttpSession
@@ -29,20 +31,29 @@ async def test_polling(token):
     """Test if a token can be used for polling"""
     temp_bot = None
     try:
-        # Create temporary bot and session
-        temp_bot = telebot.TeleBot(token, parse_mode=ParseMode.HTML)
-        temp_bot.remove_webhook()
-        temp_bot.polling(non_stop=False, timeout=2, logger_level=None)
+        def start_polling():
+            try:
+                # Create temporary bot and session
+                temp_bot = telebot.TeleBot(token, parse_mode=ParseMode.HTML)
+                temp_bot.remove_webhook()
+                temp_bot.polling(non_stop=False, timeout=2, long_polling_timeout=2, logger_level=None)
+            except TelegramConflictError:
+                return
+            except Exception as e:
+                return
         await log_info(f"Testing token {token} for polling", type_e="info")
-            
-        # Try to get updates - this will fail if another instance is polling
-        await temp_bot.get_updates(limit=1, timeout=1)
-        await log_info(f"Token {token} is available for polling", type_e="info")
-        return True
-    except TelegramConflictError:
-        await log_info(f"Token {token} is already in use for polling", type_e="error")
-        return False
+        polling_thread = threading.Thread(target=start_polling, daemon=True)
+        polling_thread.start()
+        time.sleep(5)
+        if polling_thread.is_alive():
+            polling_thread.join()
+            await log_info(f"Token {token} is available for polling", type_e="info")
+            return True
+        else:
+            return False
     except Exception as e:
+        if polling_thread:
+            polling_thread.join()
         await log_info(f"Error testing polling: {e}", type_e="error")
         return False
 
