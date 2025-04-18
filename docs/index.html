@@ -46,23 +46,22 @@
       flex-direction: column;
       align-items: stretch;
       justify-content: flex-start;
-      /* Добавляем вертикальный отступ сверху с учётом Safe Area */
       padding: calc(env(safe-area-inset-top) + var(--v-padding)) var(--h-padding) env(safe-area-inset-bottom) var(--h-padding);
-      height: 100%;
-      width: 100%;
+      height: 100%; width: 100%;
     }
-    /* Форма занимает всю высоту контейнера */
     form { display: flex; flex-direction: column; width: 100%; height: 100%; }
 
-    /* Блок с группами: только поля и метки кликабельны */
+    /* Отключаем события на пустых областях группы */
     .form-group { margin-bottom: var(--group-gap); display: flex; flex-direction: column; pointer-events: none; }
-    label, input, select, textarea { pointer-events: auto; }
+    /* Разрешаем события только на элементах ввода и метках */
+    input, select, textarea, label { pointer-events: auto; }
 
+    /* Ограничиваем ширину метки по тексту */
+    label { display: inline-block; margin-bottom: 0.25rem; font-weight: bold; font-size: var(--label-size); color: var(--text-color); }
     /* Блок товара растягивается */
     #group-product { flex: 1; display: flex; flex-direction: column; }
     #group-product textarea { flex: 1; }
 
-    label { margin-bottom: 0.25rem; font-weight: bold; font-size: var(--label-size); color: var(--text-color); }
     input, select, textarea {
       padding: var(--input-padding);
       font-size: var(--input-font);
@@ -80,12 +79,10 @@
     button {
       padding: var(--button-padding);
       font-size: var(--button-font);
-      border: none;
-      border-radius: 0.4rem;
+      border: none; border-radius: 0.4rem;
       background-color: var(--button-bg);
       color: var(--button-text);
-      cursor: pointer;
-      margin-top: var(--group-gap);
+      cursor: pointer; margin-top: var(--group-gap); width: 100%;
     }
     button:active { opacity: 0.8; }
 
@@ -146,38 +143,23 @@
       const base = Math.max(window.innerWidth, window.innerHeight) / 35;
       document.documentElement.style.fontSize = base + 'px';
     }
-    adjustFont();
-    window.addEventListener('resize', adjustFont);
+    adjustFont(); window.addEventListener('resize', adjustFont);
 
     document.addEventListener('DOMContentLoaded', () => {
       if (window.Telegram && Telegram.WebApp) {
-        const tg = Telegram.WebApp;
-        tg.ready();
-        if (tg.requestFullscreen) tg.requestFullscreen(); else tg.expand();
-        const theme = tg.colorScheme || 'light';
-        document.body.setAttribute('data-theme', theme);
+        const tg = Telegram.WebApp; tg.ready(); if (tg.requestFullscreen) tg.requestFullscreen(); else tg.expand(); const theme = tg.colorScheme || 'light'; document.body.setAttribute('data-theme', theme);
       }
-
-      
-
       const form = document.getElementById('dataForm');
       const fields = ['date','time','store','product','total','currency'];
       fields.forEach(id => {
         const input = document.getElementById(id);
         input.addEventListener('input', () => {
-          const err = input.nextElementSibling;
-          err.style.display = input.checkValidity() ? 'none' : 'block';
+          const err = input.nextElementSibling; err.style.display = input.checkValidity() ? 'none' : 'block';
         });
       });
-
       form.addEventListener('submit', e => {
-        e.preventDefault();
-        let valid = true;
-        fields.forEach(id => { if (!document.getElementById(id).checkValidity()) valid = false; });
-        if (!valid) return;
-
-        const data = {};
-        fields.forEach(id => data[id] = document.getElementById(id).value);
+        e.preventDefault(); let valid = true; fields.forEach(id => { if (!document.getElementById(id).checkValidity()) valid = false; }); if (!valid) return;
+        const data = {}; fields.forEach(id => data[id] = document.getElementById(id).value);
         if (window.Telegram && Telegram.WebApp) Telegram.WebApp.sendData(JSON.stringify(data)); else console.log(data);
       });
     });
