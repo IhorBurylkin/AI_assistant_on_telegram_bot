@@ -138,7 +138,7 @@
   </div>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script>
-    // Подстройка размера шрифта (уменьшаем масштаб для 6" экрана)
+    // Подстройка размера шрифта
     function adjustFont() {
       const base = Math.max(window.innerWidth, window.innerHeight) / 35;
       document.documentElement.style.fontSize = base + 'px';
@@ -147,20 +147,38 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       if (window.Telegram && Telegram.WebApp) {
-        const tg = Telegram.WebApp; tg.ready(); if (tg.requestFullscreen) tg.requestFullscreen(); else tg.expand(); const theme = tg.colorScheme || 'light'; document.body.setAttribute('data-theme', theme);
+        const tg = Telegram.WebApp;
+        tg.ready();
+        if (tg.requestFullscreen) tg.requestFullscreen(); else tg.expand();
+        const theme = tg.colorScheme || 'light';
+        document.body.setAttribute('data-theme', theme);
       }
+
       const form = document.getElementById('dataForm');
       const fields = ['date','time','store','product','total','currency'];
-      fields.forEach(id => {
-        const input = document.getElementById(id);
-        input.addEventListener('input', () => {
-          const err = input.nextElementSibling; err.style.display = input.checkValidity() ? 'none' : 'block';
-        });
-      });
-      form.addEventListener('submit', e => {
-        e.preventDefault(); let valid = true; fields.forEach(id => { if (!document.getElementById(id).checkValidity()) valid = false; }); if (!valid) return;
-        const data = {}; fields.forEach(id => data[id] = document.getElementById(id).value);
-        if (window.Telegram && Telegram.WebApp) Telegram.WebApp.sendData(JSON.stringify(data)); else console.log(data);
+      form.addEventListener('submit', async e => {
+        e.preventDefault();
+        let valid = true;
+        fields.forEach(id => { if (!document.getElementById(id).checkValidity()) valid = false; });
+        if (!valid) return;
+
+        const data = {};
+        fields.forEach(id => data[id] = document.getElementById(id).value);
+        try {
+          // Отправляем данные на серверный endpoint fast_api.py
+          await fetch('/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+        } catch (err) {
+          console.error('Error sending data:', err);
+        } finally {
+          // Закрываем WebApp
+          if (window.Telegram && Telegram.WebApp) {
+            Telegram.WebApp.close();
+          }
+        }
       });
     });
   </script>
