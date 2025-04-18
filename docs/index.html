@@ -168,11 +168,6 @@
         }
       });
 
-      // Кнопка "Свернуть клавиатуру"
-      document.getElementById('hideKeyboard').addEventListener('click', () => {
-        document.activeElement.blur();
-      });
-
       const form = document.getElementById('dataForm');
       const fields = ['date','time','store','product','total','currency'];
       fields.forEach(id => {
