@@ -2,74 +2,35 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Форма данных</title>
   <style>
-    body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: sans-serif; }
-    .container { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; height: 100%; box-sizing: border-box; }
-    form { display: flex; flex-direction: column; width: 100%; max-width: 400px; }
-    .form-group { margin-bottom: 15px; display: flex; flex-direction: column; }
-    label { margin-bottom: 5px; font-weight: bold; }
-    input, select { padding: 10px; font-size: 1rem; border: 1px solid #ccc; border-radius: 5px; }
-    input:invalid, select:invalid { border-color: red; }
-    input:valid, select:valid { border-color: green; }
-    .error { color: red; font-size: 0.9rem; display: none; }
+    /* Обнуляем отступы и устанавливаем адаптивность */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: sans-serif; }
+    /* Динамический базовый размер шрифта */
+    :root { font-size: 16px; }
+    /* Контейнер занимает всё доступное пространство */
+    .container { display: flex; flex-direction: column; align-items: stretch; justify-content: center;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      height: 100%; width: 100%; }
+    form { display: flex; flex-direction: column; width: 100%; max-width: none; }
+    .form-group { margin-bottom: 1rem; display: flex; flex-direction: column; }
+    label { margin-bottom: 0.5rem; font-weight: bold; font-size: 1rem; }
+    input, select { padding: 0.75rem; font-size: 1rem; border: 1px solid #888; border-radius: 0.5rem; width: 100%; }
+    input:invalid, select:invalid { border-color: #f33; }
+    input:valid, select:valid { border-color: #3a3; }
+    .error { color: #f33; font-size: 0.875rem; display: none; }
+    button { padding: 1rem; font-size: 1rem; border: none; border-radius: 0.5rem; background-color: #2a86ff; color: #fff; cursor: pointer; margin-top: 1rem; }
+    button:active { opacity: 0.8; }
+    /* Поворот экрана */
     @media (orientation: landscape) {
+      .container { padding: 1rem; }
       form { flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
       .form-group { width: 48%; }
+      button { width: 48%; align-self: center; }
     }
   </style>
-  <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      // Инициализация Telegram WebApp
-      if (window.Telegram && Telegram.WebApp) {
-        Telegram.WebApp.init();
-        Telegram.WebApp.expand();
-      }
-
-      const form = document.getElementById('dataForm');
-      const fields = ['date', 'time', 'store', 'product', 'total', 'currency'];
-
-      // Подключаем валидацию полей
-      fields.forEach(id => {
-        const input = document.getElementById(id);
-        input.addEventListener('input', () => validateField(input));
-      });
-
-      function validateField(input) {
-        const error = input.nextElementSibling;
-        if (!input.checkValidity()) {
-          error.style.display = 'block';
-        } else {
-          error.style.display = 'none';
-        }
-      }
-
-      form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        let valid = true;
-        fields.forEach(id => {
-          const input = document.getElementById(id);
-          validateField(input);
-          if (!input.checkValidity()) valid = false;
-        });
-
-        if (valid) {
-          const data = fields.reduce((obj, id) => {
-            obj[id] = document.getElementById(id).value;
-            return obj;
-          }, {});
-
-          // Отправляем данные в бот через Telegram WebApp
-          if (window.Telegram && Telegram.WebApp) {
-            Telegram.WebApp.sendData(JSON.stringify(data));
-          } else {
-            console.log(data);
-          }
-        }
-      });
-    });
-  </script>
 </head>
 <body>
   <div class="container">
@@ -79,31 +40,26 @@
         <input type="date" id="date" required>
         <div class="error">Пожалуйста, выберите дату.</div>
       </div>
-
       <div class="form-group">
         <label for="time">Время</label>
         <input type="time" id="time" required>
         <div class="error">Пожалуйста, выберите время.</div>
       </div>
-
       <div class="form-group">
         <label for="store">Магазин</label>
         <input type="text" id="store" required minlength="2">
         <div class="error">Введите название магазина.</div>
       </div>
-
       <div class="form-group">
         <label for="product">Наименование товара</label>
         <input type="text" id="product" required minlength="2">
         <div class="error">Введите название товара.</div>
       </div>
-
       <div class="form-group">
         <label for="total">Итого</label>
         <input type="number" id="total" required step="0.01" min="0">
         <div class="error">Введите корректную сумму.</div>
       </div>
-
       <div class="form-group">
         <label for="currency">Валюта</label>
         <select id="currency" required>
@@ -114,9 +70,54 @@
         </select>
         <div class="error">Выберите валюту.</div>
       </div>
-
       <button type="submit">Отправить</button>
     </form>
   </div>
+  <script>
+    // Динамически меняем базовый размер шрифта для читаемости
+    function adjustFontSize() {
+      const size = Math.max(window.innerWidth, window.innerHeight) / 25;
+      document.documentElement.style.fontSize = size + 'px';
+    }
+    window.addEventListener('resize', adjustFontSize);
+    adjustFontSize();
+
+    // Telegram Web App
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.Telegram && Telegram.WebApp) {
+        Telegram.WebApp.ready();
+        Telegram.WebApp.expand();
+      }
+
+      const form = document.getElementById('dataForm');
+      const fields = ['date','time','store','product','total','currency'];
+
+      fields.forEach(id => {
+        const input = document.getElementById(id);
+        input.addEventListener('input', () => {
+          const error = input.nextElementSibling;
+          if (!input.checkValidity()) error.style.display = 'block';
+          else error.style.display = 'none';
+        });
+      });
+
+      form.addEventListener('submit', e => {
+        e.preventDefault();
+        let valid = true;
+        fields.forEach(id => {
+          const input = document.getElementById(id);
+          if (!input.checkValidity()) valid = false;
+        });
+        if (!valid) return;
+
+        const data = {};
+        fields.forEach(id => data[id] = document.getElementById(id).value);
+
+        if (window.Telegram && Telegram.WebApp) {
+          Telegram.WebApp.sendData(JSON.stringify(data));
+        } else console.log(data);
+      });
+    });
+  </script>
 </body>
 </html>
