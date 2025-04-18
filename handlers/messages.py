@@ -1,5 +1,7 @@
+import json
 from aiogram import types, F, Router
 from aiogram.enums import ChatType, ParseMode
+from aiogram.types import WebAppInfo, ContentType
 from services.db_utils import update_user_data, read_user_all_data
 from config import BOT_USERNAME, DEFAULT_LANGUAGES
 from handlers.callbacks import get_persistent_menu
@@ -74,4 +76,16 @@ async def group_message_handler(message: types.Message):
         await log_info(f"Group message processed for chat {message.chat.id}", type_e="info")
     except Exception as e:
         await log_info(f"Error in group_message_handler for chat {message.chat.id}: {e}", type_e="error")
+        raise
+
+@messages_router.message(ContentType.WEB_APP_DATA)
+async def web_app_data_handler(message: types.Message):
+    try:
+        raw = message.web_app_data.data
+        data = json.loads(raw)
+        text = "✅ Данные приняты:\n" + json.dumps(data, ensure_ascii=False, indent=2)
+        print(text)
+        await log_info(f"Web App Data processed for user {message.from_user.id}", type_e="info")
+    except Exception as e:
+        await log_info(f"Error in web_app_data_handler for user {message.from_user.id}: {e}", type_e="error")
         raise

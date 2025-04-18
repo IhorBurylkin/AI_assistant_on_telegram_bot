@@ -9,9 +9,8 @@ import os
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from logs import log_info
-from config import WHITE_LIST
+from config import WHITE_LIST, LOGGING_SETTINGS_TO_SEND, PRODUCT_KEYS, PRODUCT_KEYS_FOR_PARSE, MESSAGES
 from services.db_utils import update_user_data
-from config import LOGGING_SETTINGS_TO_SEND
 
 async def send_info_msg(text=None, message_thread_id=None, info_bot=None, chat_id=None):
     """
@@ -167,6 +166,16 @@ async def time_until_midnight_utc() -> timedelta:
         await log_info(f"Error calculating time until midnight (UTC): {e}", type_e="error")
         raise
 
+async def get_current_datetime():
+    """
+    Asynchronously returns the current date and time.
+
+    The function simulates an asynchronous operation by awaiting asyncio.sleep(0),
+    then returns the current datetime using datetime.datetime.now().
+    """
+    await asyncio.sleep(0)  # This makes the function awaitable in an async context
+    return datetime.now(timezone.utc)
+
 def order_points(pts):
     """
     Sorts points in the order:
@@ -268,3 +277,189 @@ async def open_cv_image_processing(image_path):
     except Exception as e:
         await log_info(f"Error processing image: {e}", type_e="error")
         return image_path
+    
+async def split_str_to_dict(text: str, split_only_line: bool = False):
+    """
+    Splits a string into a dictionary.
+    :param text: Input string
+    :return: Dictionary
+    """
+    try:
+        lines = text.splitlines()
+        message_to_db = {}
+        i = 0
+        if split_only_line:
+            while i < len(lines):
+                line = lines[i].strip()
+                if ":" in line:
+                    key, value = line.split(":", 1)
+                    key = key.strip()
+                    value = value.strip()
+                    if not value:
+                        additional_lines = []
+                        i += 1
+                        while i < len(lines) and (":" not in lines[i]):
+                            additional_lines.append(lines[i].strip())
+                            i += 1
+                        value = "\n".join(additional_lines)
+                        message_to_db[key] = value
+                        continue 
+                    else:
+                        message_to_db[key] = value
+                i += 1
+            return message_to_db
+        else:
+            while i < len(lines):
+                line = lines[i].strip()
+                if ":" in line:
+                    key, value = line.split(":", 1)
+                    key = key.strip()
+                    value = value.strip()
+                    # Если после двоеточия значение отсутствует
+                    if not value:
+                        # Если ключ соответствует одному из вариантов для товаров
+                        if key in PRODUCT_KEYS:
+                            product_dict = {}
+                            i += 1
+                            # Собираем строки, пока не встретим новую строку с двоеточием
+                            while i < len(lines) and (":" not in lines[i]):
+                                curr_line = lines[i].strip()
+                                # Если строка соответствует формату "Название - Цена"
+                                if " - " in curr_line:
+                                    prod_key, prod_val = curr_line.split(" - ", 1)
+                                    product_dict[prod_key.strip()] = prod_val.strip()
+                                i += 1
+                            message_to_db[key] = product_dict
+                            continue  # переход к следующей итерации цикла (i уже обновлён)
+                        else:
+                            val_list = []
+                            i += 1
+                            while i < len(lines) and (":" not in lines[i]):
+                                val_list.append(lines[i].strip())
+                                i += 1
+                            message_to_db[key] = "\n".join(val_list)
+                            continue
+                    else:
+                        message_to_db[key] = value
+                i += 1
+            return message_to_db
+    except Exception as e:
+        await log_info(f"Error splitting string to dict: {e}", type_e="error")
+        return {}
+    
+async def dict_to_str(message_dict: dict) -> str:
+    """
+    Converts a dictionary to a string.
+    :param message_dict: Input dictionary
+    :return: String representation of the dictionary
+    """
+    try:
+        result = []
+        for key, value in message_dict.items():
+            if isinstance(value, dict):
+                sub_result = dict_to_str(value)
+                result.append(f"{key}:\n{sub_result}")
+            else:
+                result.append(f"{key}: {value}")
+        return "\n".join(result)
+    except Exception as e:
+        await log_info(f"Error converting dict to string: {e}", type_e="error")
+        return ""
+    
+async def map_keys(input_data, user_id: int, lang: str) -> dict:
+    """
+    Maps keys in the input dictionary to new keys based on the mapping dictionary.
+    :param input_dict: Input dictionary
+    :param mapping_dict: Mapping dictionary
+    :return: New dictionary with mapped keys
+    """
+    async def mapping_func(single_dict: dict, mapping: dict, user_id: int) -> dict:
+        output = {"user_id": user_id}
+        for key, value in single_dict.items():
+            if key in mapping:
+                output[mapping[key]] = value
+            else:
+                output[key] = value
+        return output
+
+    try:
+        db_fields = ["date", "time", "store", "category", "product", "quantity", "price", "total", "currency"]
+        mapping = dict(zip(MESSAGES[lang]["check_struckture_category_for_db"], db_fields))
+        if isinstance(input_data, list):
+            result_list = []
+            for item in input_data:
+                mapped_item = await mapping_func(item, mapping, user_id)
+                result_list.append(mapped_item)
+            return result_list
+        elif isinstance(input_data, dict):
+            return await mapping_func(input_data, mapping, user_id)
+        else:
+            raise TypeError("Input data must be a dict or a list of dicts")
+    except Exception as e:
+        await log_info(f"Error mapping keys: {e}", type_e="error")
+        return {}
+    
+async def parse_ai_result_response(data: dict, lang: str) -> list:
+    """
+    Parses the AI result response and converts it into a list of dictionaries.
+    :param data: Input dictionary
+    :return: List of dictionaries
+    """
+    result = []
+    header_keys = MESSAGES[lang]["check_struckture_data_for_parse"]
+    header = {key: data.get(key, "") for key in header_keys}
+    
+    current_category = ""
+    
+    product_name = MESSAGES[lang]["check_struckture_data_for_product_name"]
+    product_block = data.get(product_name, "")
+    lines = [line.strip() for line in product_block.splitlines() if line.strip()]
+
+    PRODUCT_KEYS = MESSAGES[lang]["check_struckture_data_for_db"]
+    
+    for line in lines:
+        if line.endswith(":"):
+            current_category = line.rstrip(":").strip()
+            continue
+        parts = line.split(" - ")
+        if len(parts) < 2:
+            continue
+        price_str = parts[1].strip()
+        try:
+            price = float(price_str.replace(" ", "").replace(",", "."))
+        except ValueError:
+            price = 0.0
+
+        left_part = parts[0].strip()
+        found_delim = None
+        for delim in [" x ", " X ", "x", "X", "*"]:
+            if delim in left_part:
+                found_delim = delim
+                break
+
+        if found_delim:
+            name_qty = left_part.split(found_delim, 1)
+            product_name = name_qty[0].strip()
+            qty_str = name_qty[1].strip()
+            try:
+                quantity = int(qty_str)
+            except ValueError:
+                quantity = 1
+        else:
+            product_name = left_part
+            quantity = 1
+        
+        item = {
+            PRODUCT_KEYS_FOR_PARSE[0]: header.get(PRODUCT_KEYS[0], ""),
+            PRODUCT_KEYS_FOR_PARSE[1]: header.get(PRODUCT_KEYS[1], ""),
+            PRODUCT_KEYS_FOR_PARSE[2]: header.get(PRODUCT_KEYS[2], ""),
+            PRODUCT_KEYS_FOR_PARSE[3]: current_category,
+            PRODUCT_KEYS_FOR_PARSE[4]: product_name,
+            PRODUCT_KEYS_FOR_PARSE[5]: quantity,
+            PRODUCT_KEYS_FOR_PARSE[6]: price,
+            PRODUCT_KEYS_FOR_PARSE[7]: header.get(PRODUCT_KEYS[7], ""),
+            PRODUCT_KEYS_FOR_PARSE[8]: header.get(PRODUCT_KEYS[8], "")
+        }
+        result.append(item)
+    
+    return result

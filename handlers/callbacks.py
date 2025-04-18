@@ -1,12 +1,12 @@
 import requests
 from aiogram import types, Router, F
 from aiogram.enums import ChatType, ParseMode
-from services.db_utils import read_user_all_data, update_user_data, clear_user_context
-from config import MESSAGES, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGES
+from services.db_utils import read_user_all_data, update_user_data, clear_user_context, update_checks_analytics_columns, write_user_to_json
+from services.utils import get_current_datetime, dict_to_str, map_keys, split_str_to_dict
+from config import MESSAGES, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGES, CHECKS_ANALYTICS
 from aiogram.types import ForceReply
 from aiogram.fsm.context import FSMContext
 from io import BytesIO
-from bot_instance import bot
 from logs import log_info
 from services.user_service import handle_message
 from keyboards.reply_kb import get_persistent_menu
@@ -22,13 +22,18 @@ from keyboards.inline_kb import (
     get_generation_inline, 
     get_generate_image_inline,
     get_add_check_inline,
-    get_add_check_accept_inline
+    get_add_check_accept_inline,
+    get_continue_add_check_accept_inline,
+    get_calendar
     ) 
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types.input_file import InputFile as AbstractInputFile
 
 callbacks_router = Router()
+
+message_to_db = {}
+list_of_dict = []
 
 class PromptState(StatesGroup):
     waiting_for_input = State()
@@ -179,14 +184,31 @@ async def process_options_callback(query: types.CallbackQuery, state: FSMContext
 
         elif data == "accept":
             await state.clear()
-            await query.answer(text=MESSAGES[lang]['inline_kb']['options']['accept'], show_alert=False)
+            #dict_for_db = await map_keys(message_to_db, chat_id, lang)
+            list_of_dict_for_db = await map_keys(list_of_dict, chat_id, lang)
+            print("list_of_dict\n", list_of_dict)
+            print("list_of_dict_for_db\n", list_of_dict_for_db)
+            for dict_to_db in list_of_dict_for_db:
+                #dict_for_db['product'] = await split_str_to_dict(dict_for_db['product'], split_only_line=True)
+                await write_user_to_json(CHECKS_ANALYTICS, dict_to_db)
+            #print(dict_for_db)
+            #dict_for_db['product'] = await split_str_to_dict(dict_for_db['product'], split_only_line=True)
+            #await write_user_to_json(CHECKS_ANALYTICS, dict_for_db)
+            persistent_menu = await get_persistent_menu(chat_id)
+            await query.message.answer(text=MESSAGES[lang]['inline_kb']['options']['accept'], reply_markup=persistent_menu)
             await query.message.delete()
+            continue_add_check_accept_inline = await get_continue_add_check_accept_inline(chat_id)
+            await query.message.answer(
+                MESSAGES[lang]['inline_kb']['options']['continue'],
+                reply_markup=continue_add_check_accept_inline
+            )
             return
 
         elif data == "cancel":
             # Cancel text input state
             await state.clear()
-            await query.answer(text=MESSAGES[lang]['inline_kb']['options']['cancel'], show_alert=False)
+            persistent_menu = await get_persistent_menu(chat_id)
+            await query.message.answer(text=MESSAGES[lang]['inline_kb']['options']['cancel'], reply_markup=persistent_menu)
             await query.message.delete()
             return
 
@@ -199,6 +221,11 @@ async def process_options_callback(query: types.CallbackQuery, state: FSMContext
             await query.answer()
             await state.clear()
             return
+        elif data == "close":
+            await state.clear()
+            await query.message.delete()
+            await query.answer()
+            return
 
         await log_info(f"Options callback processed for chat_id {chat_id} with data: {data}", type_e="info")
 
@@ -208,6 +235,7 @@ async def process_options_callback(query: types.CallbackQuery, state: FSMContext
 
 @callbacks_router.message(PromptState.waiting_for_input)
 async def handle_text_input(message: types.Message, state: FSMContext):
+    global message_to_db, list_of_dict
     await log_info(f"[FSM] Prompt received from {message.chat.id}: {message.text}", type_e="debug")
 
     chat_id = message.chat.id if message.chat.type == ChatType.PRIVATE else message.from_user.id
@@ -260,36 +288,20 @@ async def handle_text_input(message: types.Message, state: FSMContext):
         # Process request through handle_message function (generation_type="check")
         return_message = await handle_message(message, generation_type="check")
         # Assuming handle_message returns a tuple (message, chat_id)
-        message_to, new_chat_id = return_message[0], return_message[1]
+        message_to, new_chat_id, list_of_dict = return_message[0], return_message[1], return_message[2]
         persistent_menu = await get_persistent_menu(new_chat_id)
-        # if message_to.strip() != "<b>System:</b> ":
-        #     await message.answer(
-        #         text=message_to,
-        #         reply_markup=persistent_menu,
-        #         parse_mode=ParseMode.HTML
-        #     )
-        #     await log_info(f"[FSM] Error processing image: {message_to}", type_e="error")
-        # else:
-        inline_add_check_accept_kb = await get_add_check_accept_inline(new_chat_id)
         await message.answer(
             text=message_to,
-            reply_markup=inline_add_check_accept_kb,
+            reply_markup=persistent_menu,
             parse_mode=ParseMode.HTML
         )
     elif message.content_type == types.ContentType.DOCUMENT:
         # Process request through handle_message function (generation_type="check")
         return_message = await handle_message(message, generation_type="check")
         # Assuming handle_message returns a tuple (message, chat_id)
-        message_to, new_chat_id = return_message[0], return_message[1]
+        message_to_db, new_chat_id, list_of_dict = return_message[0], return_message[1], return_message[2]
+        message_to = await dict_to_str(message_to_db)
         persistent_menu = await get_persistent_menu(new_chat_id)
-        # if message_to.strip() != "<b>System:</b> ":
-        #     await message.answer(
-        #         text=message_to,
-        #         reply_markup=persistent_menu,
-        #         parse_mode=ParseMode.HTML
-        #     )
-        #     await log_info(f"[FSM] Error processing image: {message_to}", type_e="error")
-        # else:
         inline_add_check_accept_kb = await get_add_check_accept_inline(new_chat_id)
         await message.answer(
             text=message_to,
@@ -320,6 +332,10 @@ async def process_profile_callback(query: types.CallbackQuery):
         elif data == "back":
             inline_profile_kb = await get_profile_inline(chat_id)
             await query.message.edit_text(MESSAGES[lang]['inline_kb']['profile']['profile_title'], reply_markup=inline_profile_kb)
+            await query.answer()
+        elif data == "calendar":
+            inline_calendar_kb = await get_calendar(chat_id)
+            await query.message.edit_text(MESSAGES[lang]['inline_kb']['profile']['calendar'], reply_markup=inline_calendar_kb)
             await query.answer()
 
         await log_info(f"Profile callback processed for chat_id {chat_id} with data: {data}", type_e="info")

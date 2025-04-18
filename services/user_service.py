@@ -7,7 +7,7 @@ from aiogram import types
 from aiogram.enums import ParseMode, ChatType
 from aiogram.types import ReplyKeyboardRemove
 from services.openai_api import generate_ai_response
-from services.utils import download_photo, convert_audio, count_tokens_for_user_text, check_user_limits
+from services.utils import download_photo, convert_audio, count_tokens_for_user_text, check_user_limits, split_str_to_dict, parse_ai_result_response
 from services.db_utils import (
     read_user_all_data,
     update_user_data,
@@ -15,7 +15,7 @@ from services.db_utils import (
     get_chat_history
 )
 from keyboards.reply_kb import get_persistent_menu
-from config import DEFAULT_LANGUAGES, SUPPORTED_EXTENSIONS, SUPPORTED_IMAGE_EXTENSIONS, MESSAGES, BOT_USERNAME
+from config import DEFAULT_LANGUAGES, PRODUCT_KEYS, SUPPORTED_EXTENSIONS, SUPPORTED_IMAGE_EXTENSIONS, MESSAGES, BOT_USERNAME
 from logs import log_info
 
 
@@ -98,11 +98,10 @@ async def handle_message(message: types.Message, generation_type: str = None, bo
         elif message.content_type == "photo":
             try:
                 if generation_type == "check":
-                    await message.answer(
-                        f"<b>System: </b>{MESSAGES.get(lang, {}).get('load_original_image_file', 'Please upload the image in original quality (without compression), send it as a file (document).')}",
-                        parse_mode=ParseMode.HTML
-                    )
-                    return
+                    return [f"<b>System: </b>{MESSAGES.get(lang, {}).get(
+                                                                        'load_original_image_file', 
+                                                                        'Please upload the image in original quality (without compression), send it as a file (document).'
+                                                                        )}", chat_id]
                 image_path = f"{chat_id}_image.jpg"
                 await download_photo(message.photo[-1], image_path, bot=bot_instance)
                 await log_info(f"Photo successfully uploaded for {chat_id} to {image_path}", type_e="info")
@@ -227,8 +226,9 @@ async def handle_message(message: types.Message, generation_type: str = None, bo
                     )
                     await log_info(f"Chat {chat_id} - model response received (preliminary): {vision_response}", type_e="info")
 
-                    user_model = "gpt-4o-mini"
+                    user_model = "deepseek-chat"
                     vision_role = MESSAGES[lang]['set_vision_role']
+                    struckture_data = MESSAGES[lang]['check_struckture_data']
                     conversation_api = [{"role": "system", "content": vision_role}]
                     user_vision_response= [{"role": "user", "content": vision_response}]
                     conversation_api.extend(user_vision_response)
@@ -237,9 +237,36 @@ async def handle_message(message: types.Message, generation_type: str = None, bo
                     )
                     await log_info(f"Chat {chat_id} - model response received (check): {ai_response}", type_e="info")
 
+                    product_info = None
+                    response_data = {}
+                    split_ai_response = await split_str_to_dict(ai_response, split_only_line=True)
+                    for key, value in split_ai_response.items():
+                        if key in PRODUCT_KEYS:
+                            product_info = value
+                        else:
+                            response_data[key] = value
+                    vision_sort_role = MESSAGES[lang]['set_vision_sort_role']
+                    conversation_api = [{"role": "system", "content": vision_sort_role}]
+                    user_vision_sort_response= [{"role": "user", "content": product_info}]
+                    conversation_api.extend(user_vision_sort_response)
+                    ai_sort_response = await generate_ai_response(
+                        user_model, set_answer, conversation=conversation_api
+                    )
+                    await log_info(f"Chat {chat_id} - model response received (finish check): {ai_sort_response}", type_e="info")
+
+                    ai_result_response = {}
+                    for key in struckture_data:
+                        if key in PRODUCT_KEYS and product_info is not None:
+                            ai_result_response[key] = f"\n{ai_sort_response}"
+                        else:
+                            ai_result_response[key] = response_data.get(key, "")
+
+                    result =  await parse_ai_result_response(ai_result_response, lang)
+                    print(ai_sort_response)
+                    print(ai_result_response)
                     # Delete "Processing..." message and return result
                     await processing_message.delete()
-                    return [ai_response, chat_id]
+                    return [ai_result_response, chat_id, result]
                 else:
                     # Form history for request
                     conversation_api = [{"role": "system", "content": role}]

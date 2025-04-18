@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Форма ввода данных</title>
+  <style>
+    .field { margin-bottom: 1em; }
+    .field input {
+      width: 100%; padding: 0.5em; box-sizing: border-box;
+      border: 1px solid #ccc; border-radius: 4px;
+    }
+    .field.valid input   { border-color: green; }
+    .field.invalid input { border-color: red;   }
+    .message {
+      display: block; margin-top: 0.2em; font-size: 0.9em;
+    }
+    .valid .message   { color: green; }
+    .invalid .message { color: red;   }
+    #buttons { display: flex; gap: 1em; margin-top: 1em; }
+    button {
+      padding: 0.5em 1em; border: none; border-radius: 4px;
+      cursor: pointer;
+    }
+    #accept-btn { background: #28a745; color: white; }
+    #close-btn  { background: #dc3545; color: white; }
+  </style>
+</head>
+<body>
+  <!-- Подключаем Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <h2>Заполните форму</h2>
+  <div id="form-container">
+    {% for name in fields %}
+      <div class="field" id="field-{{ name }}">
+        <label>{{ name }}</label><br>
+        {% if name == "Дата" %}
+          <input type="date" id="input-{{ name }}" />
+        {% elif name == "Время" %}
+          <input type="time" id="input-{{ name }}" />
+        {% elif name == "Итого" %}
+          <input type="number" step="any" id="input-{{ name }}" />
+        {% else %}
+          <input type="text" id="input-{{ name }}" />
+        {% endif %}
+        <span class="message"></span>
+      </div>
+    {% endfor %}
+
+    <div id="buttons">
+      <button id="close-btn">{{ buttons.close }}</button>
+      <button id="accept-btn">{{ buttons.accept }}</button>
+    </div>
+  </div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    const FIELDS = {{ fields | tojson(ensure_ascii=False) }};
+    const acceptBtn = document.getElementById("accept-btn");
+    const closeBtn  = document.getElementById("close-btn");
+
+    closeBtn.addEventListener("click", () => {
+      tg.close();
+    });
+
+    acceptBtn.addEventListener("click", () => {
+      let allValid = true;
+      const result = [];
+
+      FIELDS.forEach(name => {
+        const fieldDiv = document.getElementById(`field-${name}`);
+        const input    = document.getElementById(`input-${name}`);
+        const msg      = fieldDiv.querySelector(".message");
+        const value    = input.value.trim();
+
+        // Валидация
+        let valid = !!value;
+        if (valid && name === "Итого") {
+          valid = !isNaN(value);
+        }
+        // можно добавить проверку date/time, если нужно
+
+        fieldDiv.classList.toggle("valid", valid);
+        fieldDiv.classList.toggle("invalid", !valid);
+        msg.textContent = valid ? "valid" : "invalid";
+
+        if (!valid) allValid = false;
+        result.push({ [name]: value });
+      });
+
+      if (allValid) {
+        // Отправляем данные боту и закрываем WebApp
+        tg.sendData(JSON.stringify(result));
+        tg.close();
+      }
+    });
+  </script>
+</body>
+</html>

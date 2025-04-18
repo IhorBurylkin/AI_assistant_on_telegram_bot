@@ -1,6 +1,7 @@
 import asyncio
 import asyncpg
 import json
+from datetime import datetime
 from logs import log_info
 from config import DB_DSN
 
@@ -29,6 +30,18 @@ TABLE_SCHEMAS = {
     "context": {
         "user_id": "bigint",
         "context": "json"
+    },
+    "checks_analytics": {
+        "user_id": "bigint",
+        "date": "date",
+        "time": "time",
+        "store": "text",
+        "category": "text",
+        "product": "text",
+        "quantity": "bigint",
+        "price": "double precision",
+        "total": "double precision",
+        "currency": "text"
     }
 }
 
@@ -236,6 +249,36 @@ async def write_user_to_json(file_path: str, user_data: dict):
     """
     global conn
     try:
+        if "date" in user_data:
+            try:
+                user_data["date"] = datetime.strptime(user_data["date"], "%d.%m.%y").date()
+            except Exception as ex:
+                await log_info(f"Error converting date: {ex}", type_e="error")
+        if "time" in user_data:
+            try:
+                user_data["time"] = datetime.strptime(user_data["time"], "%H:%M").time()
+            except Exception as ex:
+                await log_info(f"Error converting time: {ex}", type_e="error")
+        if "product" in user_data:
+            try:
+                if isinstance(user_data["product"], dict):
+                    user_data["product"] = json.dumps(user_data["product"], ensure_ascii=False)
+                elif not isinstance(user_data["product"], str):
+                    user_data["product"] = str(user_data["product"])
+            except Exception as e:
+                await log_info(f"Error converting product_name: {e}", type_e="error")
+        if "price" in user_data:
+            try:
+                if isinstance(user_data["price"], str):
+                    user_data["price"] = float(user_data["price"].replace(",", "."))
+            except Exception as ex:
+                await log_info(f"Error converting price: {ex}", type_e="error")
+        if "total" in user_data:
+            try:
+                if isinstance(user_data["total"], str):
+                    user_data["total"] = float(user_data["total"].replace(",", "."))
+            except Exception as ex:
+                await log_info(f"Error converting total: {ex}", type_e="error")
         # Get list of columns and values from dictionary
         columns = list(user_data.keys())
         values = list(user_data.values())
@@ -392,3 +435,111 @@ async def clear_user_context(chat_id: int):
         await log_info(f"Chat history for chat_id %s cleared successfully, {chat_id}", type_e="info")
     except Exception as e:
         await log_info(f"Error clearing chat history for chat_id %s: %s, {chat_id}, {e}", type_e="error")
+
+async def add_columns_checks_analytics(chat_id: int):
+    """
+    Asynchronously adds two new columns to the 'checks_analytics' table in a PostgreSQL database.
+    
+    This function connects to the PostgreSQL database using asyncpg and executes an ALTER TABLE 
+    command to add the following columns:
+      - column_one: A TEXT type column.
+      - column_two: An INTEGER type column.
+      
+    The entire operation is wrapped in a try/except block to handle potential errors. Success and error 
+    messages are logged via the `log_info` function.
+    
+    Note: Update the connection parameters (user, password, database, host) as needed for your environment.
+    """
+    global conn
+    try:
+        # SQL query to alter the table and add two columns
+        col1_name = f'"{str(chat_id)}_date"'
+        col2_name = f'"{str(chat_id)}_values"'
+
+        query = f"""
+        ALTER TABLE checks_analytics
+        ADD COLUMN IF NOT EXISTS {col1_name} TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS {col2_name} JSON;
+        """
+        await conn.execute(query)
+        
+        # Log success message
+        await log_info(f"Successfully added {col1_name} (DATE) and {col2_name} (JSON) to checks_analytics table.", type_e="info")
+    except Exception as e:
+        # Log error message if an exception is raised
+        await log_info(f"An error occurred while adding columns to checks_analytics: {e}", type_e="error")
+
+async def update_checks_analytics_columns(chat_id: int, values, current_date):
+    """
+    Asynchronously checks if dynamic columns for the given chat_id exist in the 'checks_analytics' table.
+    If the columns exist, updates the date column with the provided current_date (DATE) value 
+    and updates the corresponding JSON column with the given values.
+
+    Parameters:
+        chat_id (int): The chat ID to determine the dynamic column names.
+                       The date column will be named "<chat_id>_date" and the JSON column "<chat_id>_values".
+        values: The JSON value to be set in the JSON column.
+        current_date: The current date (of DATE type) to be inserted in the dynamic date column.
+    
+    Logging:
+        Logs events and errors using the `log_info` function.
+    """
+    global conn
+    try:
+        # Construct the dynamic column names (enclosed in double quotes for valid SQL identifiers).
+        col1_name = f'"{str(chat_id)}_date"'
+        col2_name = f'"{str(chat_id)}_values"'
+        
+        # When checking existence in information_schema, pass the column name without quotes.
+        column_name_check = f'{chat_id}_date'
+        
+        # Check if the dynamic date column exists in the table.
+        check_query = """
+            SELECT COUNT(*) FROM information_schema.columns
+            WHERE table_name = 'checks_analytics' AND column_name = $1;
+        """
+        column_exists = await conn.fetchval(check_query, column_name_check)
+        
+        if column_exists:
+            # Construct and execute the UPDATE statement to set the new values.
+            json_values = json.dumps(values, ensure_ascii=False)
+            select_query = f"""
+                SELECT ctid AS row_id
+                FROM checks_analytics
+                WHERE {col1_name} IS NULL
+                  AND ({col2_name} IS NULL OR {col2_name}::text = '""' OR {col2_name}::text = '"[null]"')
+                LIMIT 1;
+            """
+            empty_row = await conn.fetchrow(select_query)
+            
+            if empty_row:
+                # If an empty row is found, update it with the new values.
+                row_id = empty_row["row_id"]
+                update_query = f"""
+                    UPDATE checks_analytics
+                    SET {col1_name} = $1, {col2_name} = $2
+                    WHERE ctid = $3;
+                """
+                await conn.execute(update_query, current_date, json_values, row_id)
+                await log_info(
+                    f"Updated existing row (id={row_id}) with {col1_name} = {current_date} and {col2_name} = {json_values}.",
+                    type_e="info"
+                )
+            else:
+                # If no empty row is found, insert a new row with the current date and JSON values.
+                insert_query = f"""
+                    INSERT INTO checks_analytics ({col1_name}, {col2_name})
+                    VALUES ($1, $2);
+                """
+                await conn.execute(insert_query, current_date, json_values)
+                await log_info(
+                    f"Inserted new row with {col1_name} = {current_date} and {col2_name} = {json_values}.",
+                    type_e="info"
+                )
+        else:
+            await log_info(
+                f"Column {col1_name} does not exist in table 'checks_analytics'.", 
+                type_e="error"
+            )
+    except Exception as e:
+        await log_info(f"Error updating columns for chat_id {chat_id}: {e}", type_e="error")

@@ -1,8 +1,10 @@
+import calendar
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from services.db_utils import read_user_all_data
-from config import DEFAULT_LANGUAGES, MESSAGES, MODELS, MODELS_FOR_MENU, LIMITS, WHITE_LIST
+from config import DEFAULT_LANGUAGES, MESSAGES, MODELS, MODELS_FOR_MENU, LIMITS, WHITE_LIST, WEBAPP_URL
 from logs import log_info
 from services.utils import time_until_midnight_utc
+from datetime import datetime
 
 async def get_settings_inline(chat_id: int) -> InlineKeyboardMarkup:
     # Get user's language; if not found, use default value
@@ -59,6 +61,7 @@ async def get_profile_inline(chat_id: int) -> InlineKeyboardMarkup:
     # Form inline profile menu
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['profile']['limits'], callback_data="profile:usage_limit")],
+        #[InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['profile']['calendar'], callback_data="profile:calendar")],
         [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['profile']['close'], callback_data="settings:close")]
     ])
     await log_info(f"Inline profile menu successfully created for user {chat_id}", type_e="info")
@@ -282,10 +285,25 @@ async def get_add_check_accept_inline(chat_id: int) -> InlineKeyboardMarkup:
         lang = DEFAULT_LANGUAGES
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅", callback_data="options:accept"),
+        [InlineKeyboardButton(text="✅", callback_data="options:accept:"),
         InlineKeyboardButton(text="❌", callback_data="options:cancel")],
     ])
     await log_info(f"Inline check confirmation menu successfully created for user {chat_id}", type_e="info")
+    return kb
+
+async def get_continue_add_check_accept_inline(chat_id: int) -> InlineKeyboardMarkup:
+    # Get user's language; if not found, use default value
+    user_data = await read_user_all_data(chat_id)
+    lang = user_data.get("language")
+    if not lang:
+        lang = DEFAULT_LANGUAGES
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅", callback_data="options:add_check:"),
+        InlineKeyboardButton(text="📝", web_app=WEBAPP_URL),
+        InlineKeyboardButton(text="❌", callback_data="options:close")],
+    ])
+    await log_info(f"Inline continue check confirmation menu successfully created for user {chat_id}", type_e="info")
     return kb
 
 async def get_limits_inline(chat_id: int) -> InlineKeyboardMarkup:
@@ -330,3 +348,62 @@ async def get_limits_inline(chat_id: int) -> InlineKeyboardMarkup:
     except Exception as e:
         await log_info(f"Error in command_limits: {e}", type_e="error")
         raise
+
+async def get_calendar(chat_id: int) -> InlineKeyboardMarkup:
+    """
+    Generate a calendar for the user.
+    """
+    now = datetime.now()
+    year = now.year
+    month = now.month
+
+    keyboard = InlineKeyboardMarkup(row_width=7)
+
+    prev_year = year - 1
+    next_year = year + 1
+    row_year = [
+        InlineKeyboardButton(text="««", callback_data=f"CHANGE_YEAR:{prev_year}"),
+        InlineKeyboardButton(text=str(year), callback_data="IGNORE"),
+        InlineKeyboardButton(text="»»", callback_data=f"CHANGE_YEAR:{next_year}")
+    ]
+    keyboard.row(*row_year)
+
+    if month == 1:
+        prev_month = 12
+        prev_month_year = year - 1
+    else:
+        prev_month = month - 1
+        prev_month_year = year
+
+    if month == 12:
+        next_month = 1
+        next_month_year = year + 1
+    else:
+        next_month = month + 1
+        next_month_year = year
+
+    row_month = [
+        InlineKeyboardButton(text="<", callback_data=f"CHANGE_MONTH:{prev_month_year}-{prev_month:02d}"),
+        InlineKeyboardButton(text=calendar.month_name[month], callback_data="IGNORE"),
+        InlineKeyboardButton(text=">", callback_data=f"CHANGE_MONTH:{next_month_year}-{next_month:02d}")
+    ]
+    keyboard.row(*row_month)
+
+    header = InlineKeyboardButton(text=f"{calendar.month_name[month]} {year}", callback_data="IGNORE")
+    keyboard.add(header)
+
+    days = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+    keyboard.row(*[InlineKeyboardButton(text=day, callback_data="IGNORE") for day in days])
+
+    month_calendar = calendar.monthcalendar(year, month)
+    for week in month_calendar:
+        row = []
+        for day in week:
+            if day == 0:
+                row.append(InlineKeyboardButton(text=" ", callback_data="IGNORE"))
+            else:
+                date_str = f"{year}-{month:02d}-{day:02d}"
+                row.append(InlineKeyboardButton(text=str(day), callback_data=f"DAY:{date_str}"))
+        keyboard.row(*row)
+
+    return keyboard
