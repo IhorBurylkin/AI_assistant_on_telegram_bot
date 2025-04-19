@@ -136,6 +136,7 @@ ENV/
 env.bak/
 venv.bak/
 .vscode/
+api-proxy/
 
 # Spyder project settings
 .spyderproject
@@ -180,7 +181,7 @@ white_list.json
 bot_instance.lock
 
 # Image files
-.jpg
+*.jpg
 
 # PyPI configuration file
 .pypirc
