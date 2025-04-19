@@ -550,3 +550,8 @@ async def update_checks_analytics_columns(chat_id: int, values, current_date):
             )
     except Exception as e:
         await log_info(f"Error updating columns for chat_id {chat_id}: {e}", type_e="error")
+
+async def save_form_data(data: dict):
+    chat_id = data.get("chat_id")
+    await write_user_to_json("checks_analytics", data)
+    return {"success": True}
