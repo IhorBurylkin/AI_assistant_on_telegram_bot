@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Форма данных</title>
+  <title>{{ fields.title }}</title>
   <style>
     /* Общие сбросы */
     *, *::before, *::after { box-sizing: border-box; }
@@ -99,41 +99,41 @@
   <div class="container">
     <form id="dataForm" novalidate>
       <div class="form-group">
-        <label for="date">Дата</label>
+        <label for="date">{{ fields.date_label }}</label>
         <input type="date" id="date" required>
-        <div class="error">Пожалуйста, выберите дату.</div>
+        <div class="error">{{ fields.date_error }}</div>
       </div>
       <div class="form-group">
-        <label for="time">Время</label>
+        <label for="time">{{ fields.time_label }}</label>
         <input type="time" id="time" required>
-        <div class="error">Пожалуйста, выберите время.</div>
+        <div class="error">{{ fields.time_error }}</div>
       </div>
       <div class="form-group">
-        <label for="store">Магазин</label>
+        <label for="store">{{ fields.store_label }}</label>
         <input type="text" id="store" required minlength="2">
-        <div class="error">Введите название магазина.</div>
+        <div class="error">{{ fields.store_error }}</div>
       </div>
       <div class="form-group" id="group-product">
-        <label for="product">Наименование товара</label>
-        <textarea id="product" required minlength="2" rows="2" placeholder="Введите текст..."></textarea>
-        <div class="error">Введите название товара.</div>
+        <label for="product">{{ fields.product_label }}</label>
+        <textarea id="product" required minlength="2" rows="2" placeholder="{{ fields.product_placeholder }}"></textarea>
+        <div class="error">{{ fields.product_error }}</div>
       </div>
       <div class="form-group">
-        <label for="total">Итого</label>
+        <label for="total">{{ fields.total_label }}</label>
         <input type="number" id="total" required step="0.01" min="0">
-        <div class="error">Введите корректную сумму.</div>
+        <div class="error">{{ fields.total_error }}</div>
       </div>
       <div class="form-group">
-        <label for="currency">Валюта</label>
+        <label for="currency">{{ fields.currency_label }}</label>
         <select id="currency" required>
-          <option value="">Выберите валюту</option>
+          <option value="">{{ fields.currency_select }}</option>
           <option value="RUB">RUB</option>
           <option value="USD">USD</option>
           <option value="EUR">EUR</option>
         </select>
-        <div class="error">Выберите валюту.</div>
+        <div class="error">{{ fields.currency_error }}</div>
       </div>
-      <button type="submit">Отправить</button>
+      <button type="submit">{{ buttons.submit }}</button>
     </form>
   </div>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -159,18 +159,35 @@
       form.addEventListener('submit', async e => {
         e.preventDefault();
         let valid = true;
-        fields.forEach(id => { if (!document.getElementById(id).checkValidity()) valid = false; });
+        fields.forEach(id => { 
+          const element = document.getElementById(id);
+          if (!element.checkValidity()) {
+            valid = false;
+            element.nextElementSibling.style.display = 'block';
+          } else {
+            element.nextElementSibling.style.display = 'none';
+          }
+        });
         if (!valid) return;
 
         const data = {};
         fields.forEach(id => data[id] = document.getElementById(id).value);
+        
+        // Добавляем chat_id, извлекая его из URL
+        const pathParts = window.location.pathname.split('/');
+        const chatId = pathParts[pathParts.length - 1];
+        data.chat_id = chatId;
+        
         try {
-          // Отправляем данные на серверный endpoint fast_api.py
-          await fetch('/submit', {
+          const response = await fetch('/submit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
           });
+          
+          if (!response.ok) {
+            throw new Error('Server responded with an error');
+          }
         } catch (err) {
           console.error('Error sending data:', err);
         } finally {
