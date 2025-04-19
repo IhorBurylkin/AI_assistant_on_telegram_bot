@@ -179,11 +179,13 @@
         data.chat_id = chatId;
         
         try {
-          const response = await fetch('/submit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          });
+            const API_BASE_URL = "https://aiassistantontelegrambot.uk/";
+
+            const response = await fetch(`${API_BASE_URL}/submit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
           
           if (!response.ok) {
             throw new Error('Server responded with an error');
