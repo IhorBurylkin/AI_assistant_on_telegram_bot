@@ -13,14 +13,55 @@
 
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
-		const url = new URL(request.url);
-		switch (url.pathname) {
-			case '/message':
-				return new Response('Hello, World!');
-			case '/random':
-				return new Response(crypto.randomUUID());
-			default:
-				return new Response('Not Found', { status: 404 });
+	  const url = new URL(request.url);
+	  
+	  // Обработка CORS preflight
+	  if (request.method === "OPTIONS") {
+		return new Response(null, {
+		  status: 204,
+		  headers: {
+			'Access-Control-Allow-Origin': '*',
+			'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+			'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+			'Access-Control-Max-Age': '86400',
+		  },
+		});
+	  }
+	  
+	  // Проксирование API запросов
+	  if (url.pathname.startsWith('/api/')) {
+		const backendUrl = new URL(url.pathname.replace(/^\/api/, ''), 
+								  env.BACKEND_URL || 'https://aiassistantontelegrambot.uk');
+		
+		const backendRequest = new Request(backendUrl.toString(), {
+		  method: request.method,
+		  headers: request.headers,
+		  body: request.body,
+		  redirect: 'follow',
+		});
+		
+		try {
+		  const response = await fetch(backendRequest);
+		  const newHeaders = new Headers(response.headers);
+		  newHeaders.set('Access-Control-Allow-Origin', '*');
+		  
+		  return new Response(response.body, {
+			status: response.status,
+			headers: newHeaders,
+		  });
+		} catch (error) {
+		  return new Response(JSON.stringify({error: error.message}), { 
+			status: 500,
+			headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+		  });
 		}
+	  }
+	  
+	  // Существующие эндпоинты
+	  switch (url.pathname) {
+		case '/message': return new Response('Hello, World!');
+		case '/random': return new Response(crypto.randomUUID());
+		default: return env.ASSETS.fetch(request);
+	  }
 	},
-} satisfies ExportedHandler<Env>;
+  } satisfies ExportedHandler<Env>;

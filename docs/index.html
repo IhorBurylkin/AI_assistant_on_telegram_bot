@@ -146,60 +146,66 @@
     adjustFont(); window.addEventListener('resize', adjustFont);
 
     document.addEventListener('DOMContentLoaded', () => {
-      if (window.Telegram && Telegram.WebApp) {
-        const tg = Telegram.WebApp;
-        tg.ready();
+    if (window.Telegram && Telegram.WebApp) {
+      const tg = Telegram.WebApp;
+      tg.ready();
         if (tg.requestFullscreen) tg.requestFullscreen(); else tg.expand();
         const theme = tg.colorScheme || 'light';
         document.body.setAttribute('data-theme', theme);
       }
 
       const form = document.getElementById('dataForm');
-      const fields = ['date','time','store','product','total','currency'];
-      form.addEventListener('submit', async e => {
-        e.preventDefault();
-        let valid = true;
-        fields.forEach(id => { 
-          const element = document.getElementById(id);
-          if (!element.checkValidity()) {
-            valid = false;
-            element.nextElementSibling.style.display = 'block';
-          } else {
-            element.nextElementSibling.style.display = 'none';
-          }
-        });
-        if (!valid) return;
-
-        const data = {};
-        fields.forEach(id => data[id] = document.getElementById(id).value);
-        
-        // Добавляем chat_id, извлекая его из URL
-        const pathParts = window.location.pathname.split('/');
-        const chatId = pathParts[pathParts.length - 1];
-        data.chat_id = chatId;
-        
-        try {
-            const API_BASE_URL = "https://aiassistantontelegrambot.uk/";
-
-            const response = await fetch(`${API_BASE_URL}/submit`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-          
-          if (!response.ok) {
-            throw new Error('Server responded with an error');
-          }
-        } catch (err) {
-          console.error('Error sending data:', err);
-        } finally {
-          // Закрываем WebApp
-          if (window.Telegram && Telegram.WebApp) {
-            Telegram.WebApp.close();
-          }
-        }
-      });
+  const fields = ['date','time','store','product','total','currency'];
+  
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    
+    // Валидация формы
+    let valid = true;
+    fields.forEach(id => { 
+      const element = document.getElementById(id);
+      if (!element.checkValidity()) {
+        valid = false;
+        element.nextElementSibling.style.display = 'block';
+      } else {
+        element.nextElementSibling.style.display = 'none';
+      }
     });
+    
+    if (!valid) return;
+
+    // Подготовка данных
+    const data = {};
+    fields.forEach(id => data[id] = document.getElementById(id).value);
+    
+    // Получение chat_id из URL
+    const pathParts = window.location.pathname.split('/');
+    const chatId = pathParts[pathParts.length - 1];
+    data.chat_id = chatId;
+    
+    try {
+      // Отправка через Worker API
+      const API_URL = "https://api-proxy.your-worker.workers.dev";
+      
+      const response = await fetch(`${API_URL}/api/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.message || 'Server error');
+      }
+    } catch (err) {
+      console.error('Error:', err);
+    } finally {
+      if (window.Telegram && Telegram.WebApp) {
+        Telegram.WebApp.close();
+      }
+    }
+  });
+});
   </script>
 </body>
 </html>

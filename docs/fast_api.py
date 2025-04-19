@@ -2,11 +2,15 @@ from fastapi import FastAPI, Request, Body
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from config import DEFAULT_LANGUAGES, MESSAGES
-from services.db_utils import read_user_all_data, save_form_data
+from fastapi.middleware.cors import CORSMiddleware
+from config import DEFAULT_LANGUAGES, MESSAGES, CHECKS_ANALYTICS
+from services.db_utils import read_user_all_data, write_user_to_json
 from logs import log_info
 from typing import Dict, Any
-from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
 # Словарь с текстами для формы
 DEFAULT_FORM_TEXT = {
@@ -31,17 +35,12 @@ DEFAULT_BUTTONS = {
     "submit": "Отправить"
 }
 
-# Инициализация
-app = FastAPI()
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://aiassistantontelegrambot.uk"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 @app.get("/form/{chat_id}", response_class=HTMLResponse)
@@ -81,9 +80,14 @@ async def form(request: Request, chat_id: int):
 @app.post("/submit")
 async def submit_form(data: Dict[Any, Any] = Body(...)):
     try:
-        # Сохраняем данные формы
+        chat_id = data.get("chat_id")
+        if not chat_id:
+            return JSONResponse({"status": "error", "message": "Missing chat_id"}, status_code=400)
+        
         print(data)
-        return JSONResponse({"status": "success"})
+        await log_info(f"Form data saved for chat_id {chat_id}", type_e="info")
+        
+        return JSONResponse({"status": "success", "message": "Data saved successfully"})
     except Exception as e:
         await log_info(f"Error saving form data: {e}", type_e="error")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
