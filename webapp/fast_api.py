@@ -6,31 +6,9 @@ from config import DEFAULT_LANGUAGES, MESSAGES
 from services.db_utils import read_user_all_data, save_form_data
 from logs import log_info
 from typing import Dict, Any
+from fastapi.middleware.cors import CORSMiddleware
 
 # Словарь с текстами для формы
-DEFAULT_FORM_TEXT = {
-    "title": "Форма данных",
-    "date_label": "Дата",
-    "date_error": "Пожалуйста, выберите дату.",
-    "time_label": "Время",
-    "time_error": "Пожалуйста, выберите время.",
-    "store_label": "Магазин",
-    "store_error": "Введите название магазина.",
-    "product_label": "Наименование товара",
-    "product_placeholder": "Введите текст...",
-    "product_error": "Введите название товара.",
-    "total_label": "Итого",
-    "total_error": "Введите корректную сумму.",
-    "currency_label": "Валюта",
-    "currency_select": "Выберите валюту",
-    "currency_error": "Выберите валюту."
-}
-
-DEFAULT_BUTTONS = {
-    "submit": "Отправить"
-}
-
-# Словарь для тестирования, если структура MESSAGES не соответствует ожидаемой
 DEFAULT_FORM_TEXT = {
     "title": "Форма данных",
     "date_label": "Дата",
@@ -57,6 +35,14 @@ DEFAULT_BUTTONS = {
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://aiassistantontelegrambot.uk"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/form/{chat_id}", response_class=HTMLResponse)
 async def form(request: Request, chat_id: int):
