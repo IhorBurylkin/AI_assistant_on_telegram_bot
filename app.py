@@ -4,7 +4,9 @@ import sys
 from logging.handlers import RotatingFileHandler
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
-from config import WEBAPP_URL, MESSAGES
+from config import WEBAPP_URL, MESSAGES, DEFAULT_LANGUAGES
+from services.db_utils import read_user_all_data
+from services.db_utils import get_connection, release_connection
 
 app = Flask(__name__)
 CORS(app)
@@ -35,15 +37,17 @@ app.logger.addHandler(file_handler)
 # логируем все входящие запросы
 @app.before_request
 async def log_request_info():
+    raw_body = request.get_data(as_text=True)
+    # Один вызов, полный лог
     app.logger.info(
-        "%s %s %s — Body: %s",
-        request.method, request.path, request.remote_addr,
-        request.get_data(as_text=True)
+        "%s %s %s — Body: %s — Host=%s — UA=%s",
+        request.method,
+        request.path,
+        request.remote_addr,
+        raw_body,
+        request.headers.get('Host'),
+        request.headers.get('User-Agent')
     )
-
-    app.logger.info("Headers: Host=%s, User-Agent=%s", 
-                request.headers.get('Host'),
-                request.headers.get('User-Agent'))
 
 # ——————————————————————————————————————————————————————————————
 # Конфигурация приложения
@@ -52,29 +56,33 @@ API_BASE_URL = os.getenv('API_BASE_URL', '')
 
 @app.route('/')
 async def index():
-    app.logger.info("Rendering index page, API_BASE_URL=%s", API_BASE_URL)
     chat_id = request.args.get('chat_id', type=int)
-    app.logger.info("Chat ID: %s", chat_id)
+    print(f"chat_id = {chat_id}", type(chat_id))
+    app.logger.info("Received request from chat_id = %s", chat_id)
+    user_data = await read_user_all_data(chat_id)
+    lang = user_data.get("language")
+    if not lang:
+        lang = DEFAULT_LANGUAGES
     fields = {
-        'title': 'Трекер расходов',
-        'date_label': 'Дата',
-        'date_error': 'Выберите дату',
-        'time_label': 'Время',
-        'time_error': 'Укажите время',
-        'store_label': 'Магазин',
-        'store_error': 'Укажите название магазина',
-        'product_label': 'Товары',
-        'product_placeholder': 'Введите список покупок',
-        'product_error': 'Укажите хотя бы один товар',
-        'total_label': 'Сумма',
-        'total_error': 'Укажите сумму',
-        'currency_label': 'Валюта',
-        'currency_select': 'Выберите валюту',
-        'currency_error': 'Выберите валюту'
+        'title': MESSAGES[lang]["web_app_bt"]["fields"]["title"],
+        'date_label': MESSAGES[lang]["web_app_bt"]["fields"]["date_label"],
+        'date_error': MESSAGES[lang]["web_app_bt"]["fields"]["date_error"], 
+        'time_label': MESSAGES[lang]["web_app_bt"]["fields"]["time_label"],
+        'time_error': MESSAGES[lang]["web_app_bt"]["fields"]["time_error"],
+        'store_label': MESSAGES[lang]["web_app_bt"]["fields"]["store_label"],
+        'store_error': MESSAGES[lang]["web_app_bt"]["fields"]["store_error"],
+        'product_label': MESSAGES[lang]["web_app_bt"]["fields"]["product_label"],
+        'product_placeholder': MESSAGES[lang]["web_app_bt"]["fields"]["product_placeholder"],
+        'product_error': MESSAGES[lang]["web_app_bt"]["fields"]["product_error"],
+        'total_label': MESSAGES[lang]["web_app_bt"]["fields"]["total_label"],
+        'total_error': MESSAGES[lang]["web_app_bt"]["fields"]["total_error"],
+        'currency_label': MESSAGES[lang]["web_app_bt"]["fields"]["currency_label"],
+        'currency_select': MESSAGES[lang]["web_app_bt"]["fields"]["currency_select"],
+        'currency_error': MESSAGES[lang]["web_app_bt"]["fields"]["currency_error"]
     }
     
     buttons = {
-        'submit': 'Отправить'
+        'submit': MESSAGES[lang]["web_app_bt"]["buttons"]["submit"]
     }
     
     return render_template('index.html', 
@@ -99,6 +107,11 @@ async def api_submit():
         "Product: %s, Total: %s %s, Chat ID: %s",
         date, time, store, product, total, currency, chat_id
     )
+    conn = await get_connection()
+    try:
+        pass
+    finally:
+        await release_connection(conn)
     # Return success response
     return jsonify({
         'success': True,
@@ -113,7 +126,3 @@ async def api_hello():
     resp = {'message': f'Hello, {name}!'}
     app.logger.info("Responding: %s", resp)
     return jsonify(resp), 200
-
-# ——————————————————————————————————————————————————————————————
-if __name__ == "__main__":
-    app.logger.info("Starting Waitress on 127.0.0.1:5000")

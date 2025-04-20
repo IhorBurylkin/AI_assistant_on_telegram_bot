@@ -45,17 +45,36 @@ TABLE_SCHEMAS = {
     }
 }
 
-conn = None
+_pool = None
 
-async def create_connection():
-    global conn
-    conn = await asyncpg.connect(DB_DSN)
-    await log_info("PostgreSQL connection established", type_e="info")
+async def create_pool():
+    global _pool
+    if _pool is None:
+        _pool = await asyncpg.create_pool(DB_DSN, min_size=2, max_size=10)
+        await log_info("PostgreSQL connection pool established", type_e="info")
+    return _pool
+
+async def get_connection():
+    """Get a connection from the pool or create a direct connection if no pool exists"""
+    global _pool, conn
+    if _pool is not None:
+        return await _pool.acquire()
+    if conn is None:
+        conn = await asyncpg.connect(DB_DSN)
+    return conn
+
+async def release_connection(connection):
+    """Release a connection back to the pool if using a pool"""
+    global _pool
+    if _pool is not None and connection is not _pool:
+        await _pool.release(connection)
 
 async def close_connection():
     global conn
-    await conn.close()
-    await log_info("PostgreSQL connection closed", type_e="info")
+    if conn:
+        await conn.close()
+        conn = None
+        await log_info("PostgreSQL connection closed", type_e="info")
 
 async def init_db_tables():
     """
@@ -89,7 +108,7 @@ async def init_db_tables():
                 columns_def = ", ".join([f"{col} {col_type}" for col, col_type in columns.items()])
                 create_query = f"CREATE TABLE {table_name} ({columns_def});"
                 await conn.execute(create_query)
-                await log_info(f"Table %s created with columns: %s, {table_name}, {columns_def}", type_e="info")
+                await log_info(f"Table {table_name} created with columns: {columns_def}", type_e="info")
             else:
                 # If the table exists, get a list of existing columns
                 columns_query = """
@@ -104,9 +123,9 @@ async def init_db_tables():
                     if col not in existing_columns:
                         alter_query = f"ALTER TABLE {table_name} ADD COLUMN {col} {col_type};"
                         await conn.execute(alter_query)
-                        await log_info(f"Column %s added to table %s, {col}, {table_name}", type_e="info")
+                        await log_info(f"Column {col} added to table {table_name}", type_e="info")
     except Exception as e:
-        await log_info(f"Error initializing tables: %s, {e}", type_e="error")
+        await log_info(f"Error initializing tables: {e}", type_e="error")
         raise
 
 def validate_identifier(name):
@@ -132,12 +151,12 @@ async def user_exists(user_id: int) -> bool:
         query = "SELECT 1 FROM chat_ids WHERE user_id = $1 LIMIT 1;"
         result = await conn.fetchval(query, user_id)
         
-        await log_info(f"Check for user_id %s in chat_ids table completed successfully, {user_id}", type_e="info")
+        await log_info(f"Check for user_id {user_id} in chat_ids table completed successfully", type_e="info")
         
         # If result is not None, the user was found.
         return True if result else False
     except Exception as e:
-        await log_info(f"Error checking for user {user_id} %s: %s, {user_id}, {e}", type_e="error")
+        await log_info(f"Error checking for user {user_id}: {e}", type_e="error")
         return False
 
 async def write_json(table_name: str, data):
@@ -168,13 +187,13 @@ async def write_json(table_name: str, data):
         await conn.execute(query, data)
         
         # Log successful write
-        await log_info(f"Successfully wrote JSON data to table: %s, {table_name}", type_e="info")
+        await log_info(f"Successfully wrote JSON data to table: {table_name}", type_e="info")
     except asyncpg.exceptions.UndefinedTableError:
         # Table not found
-        await log_info(f"Table not found: %s, {table_name}", type_e="error")
+        await log_info(f"Table not found: {table_name}", type_e="error")
     except Exception as e:
         # Handle other errors
-        await log_info(f"Error writing JSON to table %s: %s, {table_name}, {e}", type_e="error")
+        await log_info(f"Error writing JSON to table {table_name}: {e}", type_e="error")
     return None
 
 async def read_user_data(chat_id: int, key: str = None):
@@ -196,7 +215,7 @@ async def read_user_data(chat_id: int, key: str = None):
         # Execute query: find row in chat_ids table by user_id value
         query = "SELECT * FROM chat_ids WHERE user_id = $1 LIMIT 1;"
         row = await conn.fetchrow(query, chat_id)
-        await log_info(f"Query for chat_id: %s executed successfully, {chat_id}", type_e="info")
+        await log_info(f"Query for chat_id: {chat_id} executed successfully", type_e="info")
         
         if row is not None:
             # Convert result to dictionary for easy field access
@@ -212,7 +231,7 @@ async def read_user_data(chat_id: int, key: str = None):
     except asyncpg.exceptions.UndefinedTableError:
         await log_info("Table 'chat_ids' not found.", type_e="error")
     except Exception as e:
-        await log_info(f"An unexpected error occurred when querying chat_id %s: %s, {chat_id}, {e}", type_e="error")
+        await log_info(f"An unexpected error occurred when querying chat_id {chat_id}: {e}", type_e="error")
     return None
 
 async def read_user_all_data(chat_id: int):
@@ -226,6 +245,9 @@ async def read_user_all_data(chat_id: int):
       A Record with user data if found, otherwise None.
     """
     global conn
+    if conn is None:
+        await log_info("Database connection is not initialized", type_e="error")
+        return None
     try:
         
         # Execute query to find record by user_id (chat_id)
@@ -233,13 +255,13 @@ async def read_user_all_data(chat_id: int):
         row = await conn.fetchrow(query, chat_id)
         
         # Log successful query execution
-        await log_info(f"Query for chat_id: %s executed successfully, {chat_id}", type_e="info")
+        await log_info(f"Query for chat_id: {chat_id} executed successfully", type_e="info")
         
         # If record is found, return it; otherwise return None
         return row
     except Exception as e:
         # Log error and return None
-        await log_info(f"Error querying data for chat_id %s: %s, {chat_id}, {e}", type_e="error")
+        await log_info(f"Error querying data for chat_id {chat_id}: {e}", type_e="error")
         return None
     
 async def write_user_to_json(file_path: str, user_data: dict):
@@ -300,9 +322,9 @@ async def write_user_to_json(file_path: str, user_data: dict):
         
         # Execute query with parameters
         await conn.execute(query, *values)
-        await log_info(f"Data successfully written to table: %s, {file_path}", type_e="info")
+        await log_info(f"Data successfully written to table: {file_path}", type_e="info")
     except Exception as e:
-        await log_info(f"Error writing data to table %s: %s, {file_path}, {e}", type_e="error")
+        await log_info(f"Error writing data to table {file_path}: {e}", type_e="error")
         return None   
 
 async def update_user_data(chat_id: int, key: str, value):
@@ -327,9 +349,9 @@ async def update_user_data(chat_id: int, key: str, value):
         # Execute query. The execute method will return a string like "UPDATE <n>" on successful update.
         result = await conn.execute(query, chat_id, value)
         
-        await log_info(f"Data updated for chat_id %s, key %s, new value: %s, {chat_id}, {key}, {value}", type_e="info")
+        await log_info(f"Data updated for chat_id {chat_id}, key {key}, new value: {value}", type_e="info")
     except Exception as e:
-        await log_info(f"Error updating data for chat_id %s, key %s: %s, {chat_id}, {key}, {e}", type_e="error")
+        await log_info(f"Error updating data for chat_id {chat_id}, key {key}: {e}", type_e="error")
 
 async def get_chat_history(chat_id: int):
     """
@@ -358,13 +380,13 @@ async def get_chat_history(chat_id: int):
             context_list = []
         
         # Log successful query execution
-        await log_info(f"Chat history successfully retrieved for chat_id: %s, {chat_id}", type_e="info")
+        await log_info(f"Chat history successfully retrieved for chat_id: {chat_id}", type_e="info")
         
         # If record is found, return it as dictionary, otherwise None
         return context_list
     except Exception as e:
         # Log the error and return None
-        await log_info(f"Error retrieving chat history for chat_id %s: %s, {chat_id}, {e}", type_e="error")
+        await log_info(f"Error retrieving chat history for chat_id {chat_id}: {e}", type_e="error")
         return None 
     
 async def update_chat_history(chat_id: int, new_message: dict):
@@ -418,9 +440,9 @@ async def update_chat_history(chat_id: int, new_message: dict):
         # Convert list to JSON string for storage in JSON or text type column
         await conn.execute(query_update, chat_id, json.dumps(context_list))
         
-        await log_info(f"Chat history for chat_id %s updated successfully, {chat_id}", type_e="info")
+        await log_info(f"Chat history for chat_id {chat_id} updated successfully", type_e="info")
     except Exception as e:
-        await log_info(f"Error updating chat history for chat_id %s: %s, {chat_id}, {e}", type_e="error")
+        await log_info(f"Error updating chat history for chat_id {chat_id}: {e}", type_e="error")
 
 async def clear_user_context(chat_id: int):
     """
@@ -439,9 +461,9 @@ async def clear_user_context(chat_id: int):
         # Set empty context (empty JSON array)
         await conn.execute(query, chat_id, '[]')
         
-        await log_info(f"Chat history for chat_id %s cleared successfully, {chat_id}", type_e="info")
+        await log_info(f"Chat history for chat_id {chat_id} cleared successfully", type_e="info")
     except Exception as e:
-        await log_info(f"Error clearing chat history for chat_id %s: %s, {chat_id}, {e}", type_e="error")
+        await log_info(f"Error clearing chat history for chat_id {chat_id}: {e}", type_e="error")
 
 async def add_columns_checks_analytics(chat_id: int):
     """

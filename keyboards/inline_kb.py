@@ -271,8 +271,10 @@ async def get_add_check_inline(chat_id: int) -> InlineKeyboardMarkup:
     if not lang:
         lang = DEFAULT_LANGUAGES
 
+    webapp_url_with_chat_id = f"{WEBAPP_URL}?chat_id={chat_id}"
+
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['manual_entry'], web_app=WebAppInfo(url=WEBAPP_URL)),
+        [InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['manual_entry'], web_app=WebAppInfo(url=webapp_url_with_chat_id)),
         InlineKeyboardButton(text=MESSAGES[lang]['inline_kb']['options']['back'], callback_data="options:back")]
     ])
     await log_info(f"Inline add check menu successfully created for user {chat_id}", type_e="info")
