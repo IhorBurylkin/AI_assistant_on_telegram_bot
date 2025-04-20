@@ -140,10 +140,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   try {
-    // ——— Шаг 0. Лог в самом начале
     console.log('DOM loaded, initializing WebApp…');
-
-    // Подстройка шрифта
     function adjustFont() {
       const base = Math.max(window.innerWidth, window.innerHeight) / 35;
       document.documentElement.style.fontSize = base + 'px';
@@ -151,7 +148,6 @@ document.addEventListener('DOMContentLoaded', () => {
     adjustFont();
     window.addEventListener('resize', adjustFont);
 
-    // ——— Шаг 1. Инициализация Telegram.WebApp
     let tg = null;
     if (window.Telegram && Telegram.WebApp) {
       tg = Telegram.WebApp;
@@ -176,7 +172,6 @@ document.addEventListener('DOMContentLoaded', () => {
       console.warn('Telegram.WebApp не доступен — идём без него');
     }
 
-    // ——— Шаг 2. Готовим обработчик формы
     console.log('Registering submit handler');
     const form = document.getElementById('dataForm');
     const fields = ['date','time','store','product','total','currency'];
@@ -185,7 +180,6 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       console.log('Form submit triggered');
 
-      // Валидация
       let valid = true;
       fields.forEach(id => {
         const el = document.getElementById(id);
@@ -193,7 +187,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`Field “${id}”: value="${el.value}", valid=${isValid}`, el.validity);
         if (!isValid) {
           valid = false;
-          // показываем сообщение об ошибке
           el.nextElementSibling.style.display = 'block';
         } else {
           el.nextElementSibling.style.display = 'none';
@@ -204,11 +197,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // Сбор данных
       const data = {};
       fields.forEach(id => data[id] = document.getElementById(id).value);
 
-      // Получаем chat_id
       let chatId = '';
       try {
         chatId = (tg && tg.initDataUnsafe?.user?.id) || '';
@@ -220,7 +211,6 @@ document.addEventListener('DOMContentLoaded', () => {
       data.chat_id = chatId;
       console.log('Payload:', data);
 
-      // ——— Шаг 3. Отправка
       try {
         console.log('About to fetch /api/submit');
         const res = await fetch('/api/submit', {
@@ -237,13 +227,25 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (errReq) {
         console.error('Submit error:', errReq);
       } finally {
-        if (tg && typeof tg.close === 'function') {
+        if (tg) {
           try {
-            tg.close();
-            console.log('Telegram.WebApp.close() called');
-          } catch(errClose) {
-            console.warn('Error closing WebApp:', errClose);
+            // **Отправляем данные боту перед закрытием WebApp**
+            tg.sendData(JSON.stringify({
+              action: 'add_check',
+              ...data
+            }));
+            console.log('Telegram.WebApp.sendData() called with:', data);
+          } catch (errSend) {
+            console.warn('Error sending data to bot:', errSend);
           }
+          setTimeout(() => {
+            try {
+              tg.close();
+              console.log('Telegram.WebApp.close() called');
+            } catch(errClose) {
+              console.warn('Error closing WebApp:', errClose);
+            }
+          }, 300);
         }
       }
     });

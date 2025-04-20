@@ -80,7 +80,7 @@ async def group_message_handler(message: types.Message):
         raise
 
 @messages_router.message(F.content_type == ContentType.WEB_APP_DATA)
-async def handle_web_app_data(message: Message):
+async def handle_web_app_data(message: types.Message):
     try:
         raw = message.web_app_data.data
         data = json.loads(raw)

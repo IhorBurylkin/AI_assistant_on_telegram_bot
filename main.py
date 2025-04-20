@@ -1,7 +1,6 @@
 import asyncio
 import tracemalloc
 import contextlib
-import subprocess
 import signal
 import sys
 import asyncio
@@ -14,8 +13,10 @@ from handlers.messages import messages_router
 from handlers.callbacks import callbacks_router
 from handlers.commands import commands_router
 from logs import log_info
-from app import app
-from concurrent.futures import ThreadPoolExecutor
+from asgiref.wsgi import WsgiToAsgi
+from app import app as flask_app
+from hypercorn.asyncio import serve
+from hypercorn.config import Config
 
 async def set_commands(bot):
     """Set bot commands for different scopes"""
@@ -42,12 +43,13 @@ async def database_connection():
         await close_connection()
 
 async def run_web_app():
-    """Run the web application"""
-    cmd = ["uvicorn", "asgi:asgi_app", "--host", "127.0.0.1", "--port", "5000"]
+    """Run Flask app directly in the asyncio loop"""
+    asgi_app = WsgiToAsgi(flask_app)
 
-    loop = asyncio.get_running_loop()
-    with ThreadPoolExecutor() as pool:
-        await loop.run_in_executor(pool, lambda: subprocess.run(cmd))
+    config = Config()
+    config.bind = ["127.0.0.1:5000"]
+    
+    await serve(asgi_app, config)
 
 # -------------- polling bots ----------------
 
