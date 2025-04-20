@@ -1,53 +1,23 @@
 import os
-import logging
-import sys
-from logging.handlers import RotatingFileHandler
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from config import WEBAPP_URL, MESSAGES, DEFAULT_LANGUAGES
 from services.db_utils import read_user_all_data
 from services.db_utils import get_connection, release_connection
+from logs import log_info
 
 app = Flask(__name__)
 CORS(app)
 
 CORS(app, resources={r"/api/*": {"origins": WEBAPP_URL}})
-# ——————————————————————————————————————————————————————————————
-# Логирование
-# ——————————————————————————————————————————————————————————————
-# создаём форматтер
-text_handler = logging.StreamHandler(sys.stdout)
-text_handler.setLevel(logging.INFO)
-text_handler.setFormatter(logging.Formatter(
-    '%(asctime)s %(levelname)s %(message)s'
-))
-
-# вращающийся файл-логгер: max 10MB, хранить 5 ротаций
-file_handler = RotatingFileHandler(
-    "app.log", maxBytes=10*1024*1024, backupCount=5, encoding="utf-8"
-)
-
-app.logger.propagate = False
-
-app.logger.handlers = [text_handler]
-app.logger.setLevel(logging.INFO)
-# подключаем к логгеру Flask
-app.logger.addHandler(file_handler)
 
 # логируем все входящие запросы
 @app.before_request
 async def log_request_info():
     raw_body = request.get_data(as_text=True)
     # Один вызов, полный лог
-    app.logger.info(
-        "%s %s %s — Body: %s — Host=%s — UA=%s",
-        request.method,
-        request.path,
-        request.remote_addr,
-        raw_body,
-        request.headers.get('Host'),
-        request.headers.get('User-Agent')
-    )
+    await log_info(f"{request.method} {request.path} {request.remote_addr} — Body: {raw_body} — Host={request.headers.get('Host')} — UA={request.headers.get('User-Agent')}", 
+                   type_e="info")
 
 # ——————————————————————————————————————————————————————————————
 # Конфигурация приложения
@@ -57,38 +27,40 @@ API_BASE_URL = os.getenv('API_BASE_URL', '')
 @app.route('/')
 async def index():
     chat_id = request.args.get('chat_id', type=int)
-    print(f"chat_id = {chat_id}", type(chat_id))
-    app.logger.info("Received request from chat_id = %s", chat_id)
-    user_data = await read_user_all_data(chat_id)
-    lang = user_data.get("language")
-    if not lang:
-        lang = DEFAULT_LANGUAGES
-    fields = {
-        'title': MESSAGES[lang]["web_app_bt"]["fields"]["title"],
-        'date_label': MESSAGES[lang]["web_app_bt"]["fields"]["date_label"],
-        'date_error': MESSAGES[lang]["web_app_bt"]["fields"]["date_error"], 
-        'time_label': MESSAGES[lang]["web_app_bt"]["fields"]["time_label"],
-        'time_error': MESSAGES[lang]["web_app_bt"]["fields"]["time_error"],
-        'store_label': MESSAGES[lang]["web_app_bt"]["fields"]["store_label"],
-        'store_error': MESSAGES[lang]["web_app_bt"]["fields"]["store_error"],
-        'product_label': MESSAGES[lang]["web_app_bt"]["fields"]["product_label"],
-        'product_placeholder': MESSAGES[lang]["web_app_bt"]["fields"]["product_placeholder"],
-        'product_error': MESSAGES[lang]["web_app_bt"]["fields"]["product_error"],
-        'total_label': MESSAGES[lang]["web_app_bt"]["fields"]["total_label"],
-        'total_error': MESSAGES[lang]["web_app_bt"]["fields"]["total_error"],
-        'currency_label': MESSAGES[lang]["web_app_bt"]["fields"]["currency_label"],
-        'currency_select': MESSAGES[lang]["web_app_bt"]["fields"]["currency_select"],
-        'currency_error': MESSAGES[lang]["web_app_bt"]["fields"]["currency_error"]
-    }
-    
-    buttons = {
-        'submit': MESSAGES[lang]["web_app_bt"]["buttons"]["submit"]
-    }
-    
-    return render_template('index.html', 
-                          fields=fields, 
-                          buttons=buttons, 
-                          api_base_url=API_BASE_URL)
+    if not chat_id:
+        return jsonify({'error': 'chat_id is required'}), 400
+    else:
+        await log_info(f"Received request from chat_id = {chat_id}", type_e="info")
+        user_data = await read_user_all_data(chat_id)
+        lang = user_data.get("language")
+        if not lang:
+            lang = DEFAULT_LANGUAGES
+        fields = {
+            'title': MESSAGES[lang]["web_app_bt"]["fields"]["title"],
+            'date_label': MESSAGES[lang]["web_app_bt"]["fields"]["date_label"],
+            'date_error': MESSAGES[lang]["web_app_bt"]["fields"]["date_error"], 
+            'time_label': MESSAGES[lang]["web_app_bt"]["fields"]["time_label"],
+            'time_error': MESSAGES[lang]["web_app_bt"]["fields"]["time_error"],
+            'store_label': MESSAGES[lang]["web_app_bt"]["fields"]["store_label"],
+            'store_error': MESSAGES[lang]["web_app_bt"]["fields"]["store_error"],
+            'product_label': MESSAGES[lang]["web_app_bt"]["fields"]["product_label"],
+            'product_placeholder': MESSAGES[lang]["web_app_bt"]["fields"]["product_placeholder"],
+            'product_error': MESSAGES[lang]["web_app_bt"]["fields"]["product_error"],
+            'total_label': MESSAGES[lang]["web_app_bt"]["fields"]["total_label"],
+            'total_error': MESSAGES[lang]["web_app_bt"]["fields"]["total_error"],
+            'currency_label': MESSAGES[lang]["web_app_bt"]["fields"]["currency_label"],
+            'currency_select': MESSAGES[lang]["web_app_bt"]["fields"]["currency_select"],
+            'currency_error': MESSAGES[lang]["web_app_bt"]["fields"]["currency_error"]
+        }
+        
+        buttons = {
+            'submit': MESSAGES[lang]["web_app_bt"]["buttons"]["submit"]
+        }
+        
+        return render_template('index.html', 
+                            fields=fields, 
+                            buttons=buttons, 
+                            api_base_url=API_BASE_URL)
 
 @app.route('/api/submit', methods=['POST'])
 async def api_submit():
@@ -101,13 +73,12 @@ async def api_submit():
     total = data.get('total')
     currency = data.get('currency')
     chat_id = data.get('chat_id')
+
     # Log received data
-    app.logger.info(
-        "Received expense submission - Date: %s, Time: %s, Store: %s, "
-        "Product: %s, Total: %s %s, Chat ID: %s",
-        date, time, store, product, total, currency, chat_id
-    )
+    await log_info(f"Received expense submission - Date: {date}, Time: {time}, Store: {store}, Product: {product}, Total: {total} {currency}, Chat ID: {chat_id}", 
+                   type_e="info")
     conn = await get_connection()
+    
     try:
         pass
     finally:

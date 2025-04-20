@@ -1,15 +1,25 @@
 from asgiref.wsgi import WsgiToAsgi
 from app import app as flask_app
-import asyncio
 from services.db_utils import create_pool
 
-# Create a function to initialize the database pool
+# Define the init function but don't run it immediately
 async def init_db():
     await create_pool()
 
-# Run the initialization
-loop = asyncio.get_event_loop()
-loop.run_until_complete(init_db())
+# Create an ASGI middleware that initializes the pool on first request
+class DatabaseInitMiddleware:
+    def __init__(self, app):
+        self.app = app
+        self.initialized = False
 
-# Then create the ASGI application
-asgi_app = WsgiToAsgi(flask_app)
+    async def __call__(self, scope, receive, send):
+        if not self.initialized and scope["type"] == "http":
+            await init_db()
+            self.initialized = True
+        await self.app(scope, receive, send)
+
+# Create the base ASGI app
+base_asgi_app = WsgiToAsgi(flask_app)
+
+# Wrap it with our middleware
+asgi_app = DatabaseInitMiddleware(base_asgi_app)
