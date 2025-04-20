@@ -9,7 +9,7 @@ from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats, BotCommand
 from bot_instance import initialize_bots
 from keyboards import inline_kb, reply_kb
 from services.db_utils import init_db_tables
-from services.db_utils import create_connection, close_connection
+from services.db_utils import create_connection, close_connection, create_pool
 from handlers.messages import messages_router
 from handlers.callbacks import callbacks_router
 from handlers.commands import commands_router
@@ -35,6 +35,7 @@ async def set_commands(bot):
 @contextlib.asynccontextmanager
 async def database_connection():
     try:
+        await create_pool()
         await create_connection()
         yield
     finally:

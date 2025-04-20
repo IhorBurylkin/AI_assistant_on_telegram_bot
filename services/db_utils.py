@@ -45,7 +45,7 @@ TABLE_SCHEMAS = {
     }
 }
 
-_pool = None
+_pool, conn = None
 
 async def create_pool():
     global _pool
@@ -53,6 +53,12 @@ async def create_pool():
         _pool = await asyncpg.create_pool(DB_DSN, min_size=2, max_size=10)
         await log_info("PostgreSQL connection pool established", type_e="info")
     return _pool
+
+async def create_connection():
+    """Creates a connection and initializes the global conn variable"""
+    global conn
+    conn = await get_connection()
+    await log_info("PostgreSQL connection established", type_e="info")
 
 async def get_connection():
     """Get a connection from the pool or create a direct connection if no pool exists"""
@@ -90,8 +96,9 @@ async def init_db_tables():
       3. Closes the connection.
     In case of errors, logging is done using log_info.
     """
-    global conn
+    connection = None
     try:
+        connection = await get_connection()
         # Iterate through each table in the schema
         for table_name, columns in TABLE_SCHEMAS.items():
             # Check if the table exists
@@ -127,6 +134,9 @@ async def init_db_tables():
     except Exception as e:
         await log_info(f"Error initializing tables: {e}", type_e="error")
         raise
+    finally:
+        if connection:
+            await release_connection(connection)
 
 def validate_identifier(name):
     """Validate SQL identifier (table/column name)"""
@@ -144,8 +154,9 @@ async def user_exists(user_id: int) -> bool:
     Returns:
       True if the user is found, False if the user doesn't exist or an error occurred.
     """
-    global conn
+    connection = None
     try:
+        connection = await get_connection()
         # Execute a query to check if the user exists.
         # Here the table is called "chat_ids", and it's assumed to have a "user_id" column.
         query = "SELECT 1 FROM chat_ids WHERE user_id = $1 LIMIT 1;"
@@ -158,6 +169,9 @@ async def user_exists(user_id: int) -> bool:
     except Exception as e:
         await log_info(f"Error checking for user {user_id}: {e}", type_e="error")
         return False
+    finally:
+        if connection:
+            await release_connection(connection)
 
 async def write_json(table_name: str, data):
     """
@@ -173,8 +187,9 @@ async def write_json(table_name: str, data):
     Note: if the table uses an UPSERT mechanism (e.g., by primary key),
          you can configure the query with ON CONFLICT to update an existing record.
     """
-    global conn
+    connection = None
     try:
+        connection = await get_connection()
         # Convert data to JSON-compatible format if needed (asyncpg can work with dict)
         # You can use json.dumps if you need to save as a string:
         # json_data = json.dumps(data, ensure_ascii=False, indent=4)
@@ -194,7 +209,10 @@ async def write_json(table_name: str, data):
     except Exception as e:
         # Handle other errors
         await log_info(f"Error writing JSON to table {table_name}: {e}", type_e="error")
-    return None
+        return None
+    finally:
+        if connection:
+            await release_connection(connection)
 
 async def read_user_data(chat_id: int, key: str = None):
     """
@@ -210,8 +228,9 @@ async def read_user_data(chat_id: int, key: str = None):
       or the value for the specified key if key is set.
       If the record is not found or an error occurs, returns None.
     """
-    global conn
+    connection = None
     try:
+        connection = await get_connection()
         # Execute query: find row in chat_ids table by user_id value
         query = "SELECT * FROM chat_ids WHERE user_id = $1 LIMIT 1;"
         row = await conn.fetchrow(query, chat_id)
@@ -232,7 +251,11 @@ async def read_user_data(chat_id: int, key: str = None):
         await log_info("Table 'chat_ids' not found.", type_e="error")
     except Exception as e:
         await log_info(f"An unexpected error occurred when querying chat_id {chat_id}: {e}", type_e="error")
-    return None
+        return None
+    finally:
+        if connection:
+            await release_connection(connection)
+
 
 async def read_user_all_data(chat_id: int):
     """
@@ -244,12 +267,9 @@ async def read_user_all_data(chat_id: int):
     Returns:
       A Record with user data if found, otherwise None.
     """
-    global conn
-    if conn is None:
-        await log_info("Database connection is not initialized", type_e="error")
-        return None
+    connection = None
     try:
-        
+        connection = await get_connection()
         # Execute query to find record by user_id (chat_id)
         query = "SELECT * FROM chat_ids WHERE user_id = $1"
         row = await conn.fetchrow(query, chat_id)
@@ -263,6 +283,9 @@ async def read_user_all_data(chat_id: int):
         # Log error and return None
         await log_info(f"Error querying data for chat_id {chat_id}: {e}", type_e="error")
         return None
+    finally:
+        if connection:
+            await release_connection(connection)
     
 async def write_user_to_json(file_path: str, user_data: dict):
     """
@@ -275,8 +298,9 @@ async def write_user_to_json(file_path: str, user_data: dict):
     The function creates a dynamic SQL INSERT query using column names and
     parameterized placeholders, executes the query, logs success or error, and closes the connection.
     """
-    global conn
+    connection = None
     try:
+        connection = await get_connection()
         if "date" in user_data:
             try:
                 user_data["date"] = datetime.strptime(user_data["date"], "%d.%m.%y").date()
@@ -326,6 +350,9 @@ async def write_user_to_json(file_path: str, user_data: dict):
     except Exception as e:
         await log_info(f"Error writing data to table {file_path}: {e}", type_e="error")
         return None   
+    finally:
+        if connection:
+            await release_connection(connection)
 
 async def update_user_data(chat_id: int, key: str, value):
     """
@@ -338,8 +365,9 @@ async def update_user_data(chat_id: int, key: str, value):
       
     If a record with user_id = chat_id is found, the function updates the value of column key to value.
     """
-    global conn
+    connection = None
     try:
+        connection = await get_connection()
         # Form SQL query for update. 
         # Note: column name (key) cannot be parameterized, so it's assumed
         # that the key value is safe and valid.
@@ -352,6 +380,9 @@ async def update_user_data(chat_id: int, key: str, value):
         await log_info(f"Data updated for chat_id {chat_id}, key {key}, new value: {value}", type_e="info")
     except Exception as e:
         await log_info(f"Error updating data for chat_id {chat_id}, key {key}: {e}", type_e="error")
+    finally:
+        if connection:
+            await release_connection(connection)
 
 async def get_chat_history(chat_id: int):
     """
@@ -364,8 +395,9 @@ async def get_chat_history(chat_id: int):
     Returns:
       A dictionary with row data if the record is found, or None if the record doesn't exist or an error occurred.
     """
-    global conn
+    connection = None
     try:
+        connection = await get_connection()
         # Execute query to find record by user_id in "context" table
         query = "SELECT context FROM context WHERE user_id = $1 LIMIT 1;"
         row = await conn.fetchrow(query, chat_id)
@@ -388,6 +420,9 @@ async def get_chat_history(chat_id: int):
         # Log the error and return None
         await log_info(f"Error retrieving chat history for chat_id {chat_id}: {e}", type_e="error")
         return None 
+    finally:
+        if connection:
+            await release_connection(connection)
     
 async def update_chat_history(chat_id: int, new_message: dict):
     """
@@ -407,8 +442,9 @@ async def update_chat_history(chat_id: int, new_message: dict):
       chat_id (int): User/chat identifier.
       new_message (dict): New message to add to the history (e.g., {"role": "user", "content": "Example text"}).
     """
-    global conn
+    connection = None
     try:
+        connection = await get_connection()
         # Query to get current chat history for the given chat_id
         query_select = "SELECT context FROM context WHERE user_id = $1 LIMIT 1;"
         row = await conn.fetchrow(query_select, chat_id)
@@ -443,6 +479,9 @@ async def update_chat_history(chat_id: int, new_message: dict):
         await log_info(f"Chat history for chat_id {chat_id} updated successfully", type_e="info")
     except Exception as e:
         await log_info(f"Error updating chat history for chat_id {chat_id}: {e}", type_e="error")
+    finally:
+        if connection:
+            await release_connection(connection)
 
 async def clear_user_context(chat_id: int):
     """
@@ -454,8 +493,9 @@ async def clear_user_context(chat_id: int):
     If the record is found, the function updates the value of the context column, setting it to empty (e.g., an empty JSON array '[]'),
     while the value in the user_id column remains unchanged.
     """
-    global conn
+    connection = None
     try:
+        connection = await get_connection()
         # Form query to update context column for given user_id
         query = "UPDATE context SET context = $2 WHERE user_id = $1;"
         # Set empty context (empty JSON array)
@@ -464,6 +504,9 @@ async def clear_user_context(chat_id: int):
         await log_info(f"Chat history for chat_id {chat_id} cleared successfully", type_e="info")
     except Exception as e:
         await log_info(f"Error clearing chat history for chat_id {chat_id}: {e}", type_e="error")
+    finally:
+        if connection:
+            await release_connection(connection)
 
 async def add_columns_checks_analytics(chat_id: int):
     """
@@ -479,8 +522,9 @@ async def add_columns_checks_analytics(chat_id: int):
     
     Note: Update the connection parameters (user, password, database, host) as needed for your environment.
     """
-    global conn
+    connection = None
     try:
+        connection = await get_connection()
         # SQL query to alter the table and add two columns
         col1_name = f'"{str(chat_id)}_date"'
         col2_name = f'"{str(chat_id)}_values"'
@@ -497,6 +541,9 @@ async def add_columns_checks_analytics(chat_id: int):
     except Exception as e:
         # Log error message if an exception is raised
         await log_info(f"An error occurred while adding columns to checks_analytics: {e}", type_e="error")
+    finally:
+        if connection:
+            await release_connection(connection)
 
 async def update_checks_analytics_columns(chat_id: int, values, current_date):
     """
@@ -513,8 +560,9 @@ async def update_checks_analytics_columns(chat_id: int, values, current_date):
     Logging:
         Logs events and errors using the `log_info` function.
     """
-    global conn
+    connection = None
     try:
+        connection = await get_connection()
         # Construct the dynamic column names (enclosed in double quotes for valid SQL identifiers).
         col1_name = f'"{str(chat_id)}_date"'
         col2_name = f'"{str(chat_id)}_values"'
@@ -572,6 +620,9 @@ async def update_checks_analytics_columns(chat_id: int, values, current_date):
             )
     except Exception as e:
         await log_info(f"Error updating columns for chat_id {chat_id}: {e}", type_e="error")
+    finally:
+        if connection:
+            await release_connection(connection)
 
 async def save_form_data(data: dict):
     chat_id = data.get("chat_id")
