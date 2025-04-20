@@ -185,3 +185,6 @@ bot_instance.lock
 
 # PyPI configuration file
 .pypirc
+
+# Cloudflare configuration file
+ CNAME
