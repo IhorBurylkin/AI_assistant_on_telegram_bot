@@ -2,14 +2,14 @@ import os
 import logging
 import sys
 from logging.handlers import RotatingFileHandler
-from waitress import serve
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
+from config import WEBAPP_URL, MESSAGES
 
 app = Flask(__name__)
 CORS(app)
 
-CORS(app, resources={r"/api/*": {"origins": "https://aiassistantontelegrambot.uk"}})
+CORS(app, resources={r"/api/*": {"origins": WEBAPP_URL}})
 # ——————————————————————————————————————————————————————————————
 # Логирование
 # ——————————————————————————————————————————————————————————————
@@ -53,6 +53,8 @@ API_BASE_URL = os.getenv('API_BASE_URL', '')
 @app.route('/')
 async def index():
     app.logger.info("Rendering index page, API_BASE_URL=%s", API_BASE_URL)
+    chat_id = request.args.get('chat_id', type=int)
+    app.logger.info("Chat ID: %s", chat_id)
     fields = {
         'title': 'Трекер расходов',
         'date_label': 'Дата',
@@ -107,14 +109,11 @@ async def api_submit():
 async def api_hello():
     data = request.get_json(silent=True) or {}
     name = data.get('name', 'World')
-    # Логируем факт захода в обработчик
     app.logger.info("Received hello request, name=%s", name)
     resp = {'message': f'Hello, {name}!'}
-    # Логируем тело ответа
     app.logger.info("Responding: %s", resp)
     return jsonify(resp), 200
 
 # ——————————————————————————————————————————————————————————————
 if __name__ == "__main__":
     app.logger.info("Starting Waitress on 127.0.0.1:5000")
-    serve(app, host='127.0.0.1', port=5000)
