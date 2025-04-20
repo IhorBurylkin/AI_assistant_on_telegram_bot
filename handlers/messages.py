@@ -3,9 +3,9 @@ from aiogram import types, F, Router
 from aiogram.enums import ChatType, ParseMode
 from aiogram.enums.content_type import ContentType
 from aiogram.types import Message
-from services.db_utils import update_user_data, read_user_all_data
-from config import BOT_USERNAME, DEFAULT_LANGUAGES
-from handlers.callbacks import get_persistent_menu
+from services.db_utils import update_user_data, read_user_all_data, write_user_to_json
+from config import BOT_USERNAME, DEFAULT_LANGUAGES, CHECKS_ANALYTICS, MESSAGES
+from handlers.callbacks import get_persistent_menu, get_continue_add_check_accept_inline
 from logs import log_info
 from services.user_service import handle_message
 
@@ -82,11 +82,59 @@ async def group_message_handler(message: types.Message):
 @messages_router.message(F.content_type == ContentType.WEB_APP_DATA)
 async def handle_web_app_data(message: types.Message):
     try:
+        # Extract data from the Web App
         raw = message.web_app_data.data
         data = json.loads(raw)
+        
+        # Log the received data
         text = "✅ Данные приняты:\n" + json.dumps(data, ensure_ascii=False, indent=2)
         print(text)
+        
+        # Set chat_id from message if not provided in data
+        if 'chat_id' not in data or not data['chat_id']:
+            data['chat_id'] = message.from_user.id
+        
+        chat_id = int(data['chat_id'])
+        
+        # Get user's language
+        user_data = await read_user_all_data(chat_id)
+        lang = user_data.get("language") or DEFAULT_LANGUAGES
+        
+        # Process data based on action
+        if data.get('action') == 'add_check':
+            # Map keys to database format
+            mapped_data = {}
+            mapped_data['user_id'] = chat_id
+            mapped_data['date'] = data.get('date', '')
+            mapped_data['time'] = data.get('time', '')
+            mapped_data['store'] = data.get('store', '')
+            mapped_data['product'] = data.get('product', '')
+            mapped_data['total'] = data.get('total', '')
+            mapped_data['currency'] = data.get('currency', '')
+            
+            # Write to database
+            await write_user_to_json(CHECKS_ANALYTICS, mapped_data)
+            
+            # Send confirmation message with persistent menu
+            persistent_menu = await get_persistent_menu(chat_id)
+            await message.answer(
+                text=MESSAGES[lang]['inline_kb']['options']['accept'],
+                reply_markup=persistent_menu,
+                parse_mode=ParseMode.HTML
+            )
+            
+            # Offer to add another check
+            continue_add_check_accept_inline = await get_continue_add_check_accept_inline(chat_id)
+            await message.answer(
+                MESSAGES[lang]['inline_kb']['options']['continue'],
+                reply_markup=continue_add_check_accept_inline
+            )
+        
         await log_info(f"Web App Data processed for user {message.from_user.id}", type_e="info")
     except Exception as e:
         await log_info(f"Error in web_app_data_handler for user {message.from_user.id}: {e}", type_e="error")
-        raise
+        # Send error message to user
+        await message.answer(
+            f"<b>System: </b>{MESSAGES.get(lang, {}).get('error', 'An error occurred')}",
+            parse_mode=ParseMode.HTML
+        )
