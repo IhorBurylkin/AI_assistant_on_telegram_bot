@@ -45,7 +45,8 @@ TABLE_SCHEMAS = {
     }
 }
 
-_pool, conn = None
+_pool = None
+conn = None
 
 async def create_pool():
     global _pool
@@ -108,13 +109,13 @@ async def init_db_tables():
                     WHERE table_schema = 'public' AND table_name = $1
                 );
             """
-            exists = await conn.fetchval(table_exists_query, table_name)
+            exists = await connection.fetchval(table_exists_query, table_name)
             
             if not exists:
                 # If the table doesn't exist, create a CREATE TABLE query with required columns
                 columns_def = ", ".join([f"{col} {col_type}" for col, col_type in columns.items()])
                 create_query = f"CREATE TABLE {table_name} ({columns_def});"
-                await conn.execute(create_query)
+                await connection.execute(create_query)
                 await log_info(f"Table {table_name} created with columns: {columns_def}", type_e="info")
             else:
                 # If the table exists, get a list of existing columns
@@ -122,14 +123,14 @@ async def init_db_tables():
                     SELECT column_name FROM information_schema.columns 
                     WHERE table_schema = 'public' AND table_name = $1;
                 """
-                existing_columns = await conn.fetch(columns_query, table_name)
+                existing_columns = await connection.fetch(columns_query, table_name)
                 existing_columns = {record["column_name"] for record in existing_columns}
                 
                 # Check and add missing columns
                 for col, col_type in columns.items():
                     if col not in existing_columns:
                         alter_query = f"ALTER TABLE {table_name} ADD COLUMN {col} {col_type};"
-                        await conn.execute(alter_query)
+                        await connection.execute(alter_query)
                         await log_info(f"Column {col} added to table {table_name}", type_e="info")
     except Exception as e:
         await log_info(f"Error initializing tables: {e}", type_e="error")
@@ -160,7 +161,7 @@ async def user_exists(user_id: int) -> bool:
         # Execute a query to check if the user exists.
         # Here the table is called "chat_ids", and it's assumed to have a "user_id" column.
         query = "SELECT 1 FROM chat_ids WHERE user_id = $1 LIMIT 1;"
-        result = await conn.fetchval(query, user_id)
+        result = await connection.fetchval(query, user_id)
         
         await log_info(f"Check for user_id {user_id} in chat_ids table completed successfully", type_e="info")
         
@@ -199,7 +200,7 @@ async def write_json(table_name: str, data):
         # If the table has a unique key (e.g., "id"), you can use ON CONFLICT for UPSERT.
         # Here's a simple INSERT example.
         query = f"INSERT INTO {table_name} (data) VALUES ($1);"
-        await conn.execute(query, data)
+        await connection.execute(query, data)
         
         # Log successful write
         await log_info(f"Successfully wrote JSON data to table: {table_name}", type_e="info")
@@ -233,7 +234,7 @@ async def read_user_data(chat_id: int, key: str = None):
         connection = await get_connection()
         # Execute query: find row in chat_ids table by user_id value
         query = "SELECT * FROM chat_ids WHERE user_id = $1 LIMIT 1;"
-        row = await conn.fetchrow(query, chat_id)
+        row = await connection.fetchrow(query, chat_id)
         await log_info(f"Query for chat_id: {chat_id} executed successfully", type_e="info")
         
         if row is not None:
@@ -272,7 +273,7 @@ async def read_user_all_data(chat_id: int):
         connection = await get_connection()
         # Execute query to find record by user_id (chat_id)
         query = "SELECT * FROM chat_ids WHERE user_id = $1"
-        row = await conn.fetchrow(query, chat_id)
+        row = await connection.fetchrow(query, chat_id)
         
         # Log successful query execution
         await log_info(f"Query for chat_id: {chat_id} executed successfully", type_e="info")
@@ -345,7 +346,7 @@ async def write_user_to_json(file_path: str, user_data: dict):
         query = f"INSERT INTO {file_path} ({columns_str}) VALUES ({placeholders});"
         
         # Execute query with parameters
-        await conn.execute(query, *values)
+        await connection.execute(query, *values)
         await log_info(f"Data successfully written to table: {file_path}", type_e="info")
     except Exception as e:
         await log_info(f"Error writing data to table {file_path}: {e}", type_e="error")
@@ -375,7 +376,7 @@ async def update_user_data(chat_id: int, key: str, value):
         query = f"UPDATE chat_ids SET {key} = $2 WHERE user_id = $1;"
         
         # Execute query. The execute method will return a string like "UPDATE <n>" on successful update.
-        result = await conn.execute(query, chat_id, value)
+        result = await connection.execute(query, chat_id, value)
         
         await log_info(f"Data updated for chat_id {chat_id}, key {key}, new value: {value}", type_e="info")
     except Exception as e:
@@ -400,7 +401,7 @@ async def get_chat_history(chat_id: int):
         connection = await get_connection()
         # Execute query to find record by user_id in "context" table
         query = "SELECT context FROM context WHERE user_id = $1 LIMIT 1;"
-        row = await conn.fetchrow(query, chat_id)
+        row = await connection.fetchrow(query, chat_id)
 
         if row is not None:
             # Extract value from context column; if value is None, use empty list
@@ -447,7 +448,7 @@ async def update_chat_history(chat_id: int, new_message: dict):
         connection = await get_connection()
         # Query to get current chat history for the given chat_id
         query_select = "SELECT context FROM context WHERE user_id = $1 LIMIT 1;"
-        row = await conn.fetchrow(query_select, chat_id)
+        row = await connection.fetchrow(query_select, chat_id)
         
         if row is not None:
             # Extract value from context column; if value is None, use empty list
@@ -459,7 +460,7 @@ async def update_chat_history(chat_id: int, new_message: dict):
             # If record doesn't exist, start with empty list and create new record
             context_list = []
             query_insert = "INSERT INTO context (user_id, context) VALUES ($1, $2);"
-            await conn.execute(query_insert, chat_id, json.dumps(context_list))
+            await connection.execute(query_insert, chat_id, json.dumps(context_list))
         
         # If list is empty, set it as [new_message]
         if not context_list:
@@ -474,7 +475,7 @@ async def update_chat_history(chat_id: int, new_message: dict):
         # Update record in "context" table
         query_update = "UPDATE context SET context = $2 WHERE user_id = $1;"
         # Convert list to JSON string for storage in JSON or text type column
-        await conn.execute(query_update, chat_id, json.dumps(context_list))
+        await connection.execute(query_update, chat_id, json.dumps(context_list))
         
         await log_info(f"Chat history for chat_id {chat_id} updated successfully", type_e="info")
     except Exception as e:
@@ -499,7 +500,7 @@ async def clear_user_context(chat_id: int):
         # Form query to update context column for given user_id
         query = "UPDATE context SET context = $2 WHERE user_id = $1;"
         # Set empty context (empty JSON array)
-        await conn.execute(query, chat_id, '[]')
+        await connection.execute(query, chat_id, '[]')
         
         await log_info(f"Chat history for chat_id {chat_id} cleared successfully", type_e="info")
     except Exception as e:
@@ -534,7 +535,7 @@ async def add_columns_checks_analytics(chat_id: int):
         ADD COLUMN IF NOT EXISTS {col1_name} TIMESTAMPTZ,
         ADD COLUMN IF NOT EXISTS {col2_name} JSON;
         """
-        await conn.execute(query)
+        await connection.execute(query)
         
         # Log success message
         await log_info(f"Successfully added {col1_name} (DATE) and {col2_name} (JSON) to checks_analytics table.", type_e="info")
@@ -575,7 +576,7 @@ async def update_checks_analytics_columns(chat_id: int, values, current_date):
             SELECT COUNT(*) FROM information_schema.columns
             WHERE table_name = 'checks_analytics' AND column_name = $1;
         """
-        column_exists = await conn.fetchval(check_query, column_name_check)
+        column_exists = await connection.fetchval(check_query, column_name_check)
         
         if column_exists:
             # Construct and execute the UPDATE statement to set the new values.
@@ -587,7 +588,7 @@ async def update_checks_analytics_columns(chat_id: int, values, current_date):
                   AND ({col2_name} IS NULL OR {col2_name}::text = '""' OR {col2_name}::text = '"[null]"')
                 LIMIT 1;
             """
-            empty_row = await conn.fetchrow(select_query)
+            empty_row = await connection.fetchrow(select_query)
             
             if empty_row:
                 # If an empty row is found, update it with the new values.
@@ -597,7 +598,7 @@ async def update_checks_analytics_columns(chat_id: int, values, current_date):
                     SET {col1_name} = $1, {col2_name} = $2
                     WHERE ctid = $3;
                 """
-                await conn.execute(update_query, current_date, json_values, row_id)
+                await connection.execute(update_query, current_date, json_values, row_id)
                 await log_info(
                     f"Updated existing row (id={row_id}) with {col1_name} = {current_date} and {col2_name} = {json_values}.",
                     type_e="info"
@@ -608,7 +609,7 @@ async def update_checks_analytics_columns(chat_id: int, values, current_date):
                     INSERT INTO checks_analytics ({col1_name}, {col2_name})
                     VALUES ($1, $2);
                 """
-                await conn.execute(insert_query, current_date, json_values)
+                await connection.execute(insert_query, current_date, json_values)
                 await log_info(
                     f"Inserted new row with {col1_name} = {current_date} and {col2_name} = {json_values}.",
                     type_e="info"
