@@ -19,7 +19,7 @@ from config import DEFAULT_LANGUAGES, PRODUCT_KEYS, SUPPORTED_EXTENSIONS, SUPPOR
 from logs import log_info
 
 
-async def handle_message(message: types.Message, generation_type: str = None, bot_instance=None):
+async def handle_message(message: types.Message=None, generation_type: str = None, bot_instance=None, ai_handler: str = None, user_input_list: list = None):
     """
     Unified function for processing incoming messages.
     Preserves original logic, adds asynchronous logging through log_info,
@@ -212,39 +212,55 @@ async def handle_message(message: types.Message, generation_type: str = None, bo
                     await processing_message.delete()
                     return [ai_response, chat_id]
                 elif generation_type == "check":
-                    # Check text
-                    vision_response = await generate_ai_response(
-                        user_model, content_type=message.content_type, image_path=image_path
-                    )
-                    await log_info(f"Chat {chat_id} - model response received (preliminary): {vision_response}", type_e="info")
+                    async def vision_resp():
+                        vision_response = await generate_ai_response(
+                            user_model, content_type=message.content_type, image_path=image_path
+                        )
+                        await log_info(f"Chat {chat_id} - model response received (preliminary): {vision_response}", type_e="info")
+                        return vision_response
+                    
+                    async def ai_resp():
+                        conversation_api = [{"role": "system", "content": vision_role}]
+                        user_vision_response= [{"role": "user", "content": vision_response}]
+                        conversation_api.extend(user_vision_response)
+                        ai_response = await generate_ai_response(
+                            user_model, set_answer, conversation=conversation_api
+                        )
+                        await log_info(f"Chat {chat_id} - model response received (check): {ai_response}", type_e="info") 
+                        return ai_response  
 
-                    user_model = "deepseek-chat"
+                    async def ai_sort_resp(): 
+                        product_info = None
+                        response_data = {}
+                        split_ai_response = await split_str_to_dict(ai_response, split_only_line=True)
+                        for key, value in split_ai_response.items():
+                            if key in PRODUCT_KEYS:
+                                product_info = value
+                            else:
+                                response_data[key] = value
+                        
+                        conversation_api = [{"role": "system", "content": vision_sort_role}]
+                        user_vision_sort_response= [{"role": "user", "content": product_info}]
+                        conversation_api.extend(user_vision_sort_response)
+                        ai_sort_response = await generate_ai_response(
+                            user_model, set_answer, conversation=conversation_api
+                        )
+                        await log_info(f"Chat {chat_id} - model response received (finish check): {ai_sort_response}", type_e="info")   
+                        return ai_sort_response, product_info, response_data          
+
                     vision_role = MESSAGES[lang]['set_vision_role']
-                    struckture_data = MESSAGES[lang]['check_struckture_data']
-                    conversation_api = [{"role": "system", "content": vision_role}]
-                    user_vision_response= [{"role": "user", "content": vision_response}]
-                    conversation_api.extend(user_vision_response)
-                    ai_response = await generate_ai_response(
-                        user_model, set_answer, conversation=conversation_api
-                    )
-                    await log_info(f"Chat {chat_id} - model response received (check): {ai_response}", type_e="info")
-
-                    product_info = None
-                    response_data = {}
-                    split_ai_response = await split_str_to_dict(ai_response, split_only_line=True)
-                    for key, value in split_ai_response.items():
-                        if key in PRODUCT_KEYS:
-                            product_info = value
-                        else:
-                            response_data[key] = value
                     vision_sort_role = MESSAGES[lang]['set_vision_sort_role']
-                    conversation_api = [{"role": "system", "content": vision_sort_role}]
-                    user_vision_sort_response= [{"role": "user", "content": product_info}]
-                    conversation_api.extend(user_vision_sort_response)
-                    ai_sort_response = await generate_ai_response(
-                        user_model, set_answer, conversation=conversation_api
-                    )
-                    await log_info(f"Chat {chat_id} - model response received (finish check): {ai_sort_response}", type_e="info")
+                    struckture_data = MESSAGES[lang]['check_struckture_data']
+                    if ai_handler == "api_vision":
+                        # Google vision api response
+                        vision_response = await vision_resp()
+                    else:
+                        vision_response = "\n".join(user_input_list)
+                    user_model = "deepseek-chat"
+                    # First ai response
+                    ai_response = await ai_resp()
+                    # Second ai response
+                    ai_sort_response, product_info, response_data = await ai_sort_resp()  
 
                     ai_result_response = {}
                     for key in struckture_data:
@@ -254,8 +270,6 @@ async def handle_message(message: types.Message, generation_type: str = None, bo
                             ai_result_response[key] = response_data.get(key, "")
 
                     result =  await parse_ai_result_response(ai_result_response, lang)
-                    print(ai_sort_response)
-                    print(ai_result_response)
                     # Delete "Processing..." message and return result
                     await processing_message.delete()
                     return [ai_result_response, chat_id, result]

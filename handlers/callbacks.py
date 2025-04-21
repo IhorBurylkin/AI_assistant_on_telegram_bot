@@ -299,7 +299,7 @@ async def handle_text_input(message: types.Message, state: FSMContext):
         )
     elif message.content_type == types.ContentType.DOCUMENT:
         # Process request through handle_message function (generation_type="check")
-        return_message = await handle_message(message, generation_type="check")
+        return_message = await handle_message(message, generation_type="check", ai_handler="api_vision")
         # Assuming handle_message returns a tuple (message, chat_id)
         message_to_db, new_chat_id, list_of_dict = return_message[0], return_message[1], return_message[2]
         message_to = await dict_to_str(message_to_db)

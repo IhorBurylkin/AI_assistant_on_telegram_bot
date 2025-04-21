@@ -54,7 +54,7 @@ async def initialize_bots():
     info_token = TELEGRAM_INFO_BOT_TOKEN
     if not await test_polling(main_token):
         await log_info("Main token conflict and no connection, using alternative", type_e="warning")
-        if not  await test_polling(info_token):
+        if not await test_polling(info_token):
             await log_info("Info token has conflict, trying alternative", type_e="warning")
             main_token = TELEGRAM_BOT_TOKEN_ALTERNATIVE
             info_token = TELEGRAM_INFO_BOT_TOKEN_ALTERNATIVE
@@ -66,7 +66,7 @@ async def initialize_bots():
     info_bot = await create_bot(info_token)
     dp_info_bot = Dispatcher(storage=storage_info)
     set_info_bot(info_bot)
-    
+
     return bot, dp, info_bot, dp_info_bot
 
 async def cleanup_bots():

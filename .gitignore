@@ -172,13 +172,9 @@ cython_debug/
 # Ruff stuff:
 .ruff_cache/
 
-# Config
-config.json
-chat_ids.json
-client_secret.json
-context.json
-white_list.json
-bot_instance.lock
+# Text files
+*.json
+*.lock
 
 # Image files
 *.jpg
