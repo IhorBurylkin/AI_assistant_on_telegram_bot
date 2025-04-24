@@ -1,7 +1,7 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from services.db_utils import read_user_all_data
-from config import DEFAULT_LANGUAGES, MESSAGES
-from logs import log_info
+from config.config import DEFAULT_LANGUAGES, MESSAGES
+from logs.log import log_info
 
 async def get_persistent_menu(chat_id: int, user_settings=None) -> ReplyKeyboardMarkup:
     try:

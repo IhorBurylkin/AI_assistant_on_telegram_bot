@@ -4,10 +4,11 @@ from aiogram.filters import Command
 from aiogram.enums import ParseMode, ChatType
 from aiogram.types import ReplyKeyboardRemove
 from services.db_utils import read_user_all_data, update_user_data, write_user_to_json, clear_user_context, user_exists, add_columns_checks_analytics
-from services.utils import time_until_midnight_utc, send_info_msg
-from config import MESSAGES, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGES, USERS_FILE_PATH, CHECKS_ANALYTICS, CHATGPT_MODEL, LIMITS, WHITE_LIST, LOGGING_SETTINGS_TO_SEND
-from logs import log_info
-from handlers.callbacks import get_persistent_menu, get_settings_inline, get_options_inline, get_profile_inline
+from services.utils import time_until_midnight_utc
+from config.config import MESSAGES, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGES, USERS_FILE_PATH, CHECKS_ANALYTICS, CHATGPT_MODEL, LIMITS, WHITE_LIST, LOGGING_SETTINGS_TO_SEND
+from logs.log import log_info, send_info_msg
+from keyboards.reply_kb import get_persistent_menu
+from keyboards.inline_kb import get_settings_inline, get_profile_inline, get_options_inline
 
 commands_router = Router()
 
@@ -52,6 +53,7 @@ async def send_welcome(message: types.Message):
                 "in_limit_list": lst,
                 "resolution": "1024x1024",
                 "quality": "standard",
+                "message_id": 0
             }
             await write_user_to_json(USERS_FILE_PATH, user_data)
             await log_info(f"Created new user {user_id} with chat_id {chat_id}", type_e="info")

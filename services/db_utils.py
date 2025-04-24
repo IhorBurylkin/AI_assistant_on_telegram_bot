@@ -2,8 +2,8 @@ import asyncio
 import asyncpg
 import json
 from datetime import datetime
-from logs import log_info
-from config import DB_DSN
+from logs.log import log_info
+from config.config import DB_DSN
 
 TABLE_SCHEMAS = {
     "chat_ids": {
@@ -26,6 +26,7 @@ TABLE_SCHEMAS = {
         "in_limit_list": "text",
         "resolution": "text",
         "quality": "text",
+        "message_id": "bigint"
     },
     "context": {
         "user_id": "bigint",
@@ -82,6 +83,26 @@ async def close_connection():
         await conn.close()
         conn = None
         await log_info("PostgreSQL connection closed", type_e="info")
+
+async def close_pool():
+    global _pool
+    if _pool is None:
+        return
+
+    try:
+        await asyncio.wait_for(_pool.close(), timeout=10)
+        await log_info("PostgreSQL connection pool closed gracefully", type_e="info")
+    except asyncio.TimeoutError:
+        await log_info("Timeout on Pool.close(); forcing termination", type_e="warning")
+        try:
+            _pool.terminate()
+            await log_info("PostgreSQL pool terminated", type_e="info")
+        except Exception as e:
+            await log_info(f"Error during pool.terminate(): {e}", type_e="error")
+    except Exception as e:
+        await log_info(f"Unexpected error on pool.close(): {e}", type_e="error")
+    finally:
+        _pool = None
 
 async def init_db_tables():
     """
@@ -304,7 +325,15 @@ async def write_user_to_json(file_path: str, user_data: dict):
         connection = await get_connection()
         if "date" in user_data:
             try:
-                user_data["date"] = datetime.strptime(user_data["date"], "%d.%m.%y").date()
+                date_str = user_data.get("date", "")
+                for fmt in ("%Y-%m-%d", "%d.%m.%y", "%d.%m.%Y"):
+                    try:
+                        user_data["date"] = datetime.strptime(date_str, fmt).date()
+                        break
+                    except ValueError:
+                        continue
+                else:
+                    await log_info(f"Error converting date: unsupported format '{date_str}'", type_e="error")
             except Exception as ex:
                 await log_info(f"Error converting date: {ex}", type_e="error")
         if "time" in user_data:

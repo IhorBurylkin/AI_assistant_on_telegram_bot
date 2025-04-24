@@ -15,8 +15,8 @@ from services.db_utils import (
     get_chat_history
 )
 from keyboards.reply_kb import get_persistent_menu
-from config import DEFAULT_LANGUAGES, PRODUCT_KEYS, SUPPORTED_EXTENSIONS, SUPPORTED_IMAGE_EXTENSIONS, MESSAGES, BOT_USERNAME
-from logs import log_info
+from config.config import DEFAULT_LANGUAGES, PRODUCT_KEYS, SUPPORTED_EXTENSIONS, SUPPORTED_IMAGE_EXTENSIONS, MESSAGES, BOT_USERNAME
+from logs.log import log_info
 
 
 async def handle_message(message: types.Message=None, generation_type: str = None, bot_instance=None, ai_handler: str = None, user_input_list: list = None):

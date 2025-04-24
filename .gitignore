@@ -184,3 +184,6 @@ cython_debug/
 
 # Cloudflare configuration file
 CNAME
+
+# Draft for test
+draft.py

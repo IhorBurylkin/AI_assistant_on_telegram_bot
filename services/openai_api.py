@@ -1,12 +1,10 @@
 import openai
 import base64
 import google.generativeai as genai
-from config import OPENAI_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY, GOOGLE_CREDENTIALS_PATH, MODELS
-from logs import log_info
+from config.config import OPENAI_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY, GOOGLE_CREDENTIALS_PATH, MODELS
+from logs.log import log_info
 import aiofiles
-import io
 import os
-import json
 from collections import defaultdict
 from google.cloud import vision
 from google.protobuf.json_format import MessageToDict

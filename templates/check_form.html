@@ -100,159 +100,176 @@
     <form id="dataForm" novalidate>
       <div class="form-group">
         <label for="date">{{ fields.date_label }}</label>
-        <input type="date" id="date" required>
+        <input
+          type="date"
+          id="date"
+          name="date"
+          value="{{ values.date }}"
+          required
+        >
         <div class="error">{{ fields.date_error }}</div>
       </div>
+      
       <div class="form-group">
         <label for="time">{{ fields.time_label }}</label>
-        <input type="time" id="time" required>
+        <input
+          type="time"
+          id="time"
+          name="time"
+          value="{{ values.time }}"
+          required
+        >
         <div class="error">{{ fields.time_error }}</div>
       </div>
+      
       <div class="form-group">
         <label for="store">{{ fields.store_label }}</label>
-        <input type="text" id="store" required minlength="2">
+        <input
+          type="text"
+          id="store"
+          name="store"
+          value="{{ values.store }}"
+          required
+          minlength="2"
+        >
         <div class="error">{{ fields.store_error }}</div>
       </div>
+      
       <div class="form-group" id="group-product">
         <label for="product">{{ fields.product_label }}</label>
-        <textarea id="product" required minlength="2" rows="2" placeholder="{{ fields.product_placeholder }}"></textarea>
+        <textarea
+          id="product"
+          name="product"
+          required
+          minlength="2"
+          rows="2"
+          placeholder="{{ fields.product_placeholder }}"
+        >{{ values.product }}</textarea>
         <div class="error">{{ fields.product_error }}</div>
       </div>
+      
       <div class="form-group">
         <label for="total">{{ fields.total_label }}</label>
-        <input type="number" id="total" required step="0.01" min="0">
+        <input
+          type="number"
+          id="total"
+          name="total"
+          value="{{ values.total }}"
+          required
+          step="0.01"
+          min="0"
+        >
         <div class="error">{{ fields.total_error }}</div>
       </div>
+      
       <div class="form-group">
         <label for="currency">{{ fields.currency_label }}</label>
-        <select id="currency" required>
+        <select
+          id="currency"
+          name="currency"
+          required
+        >
           <option value="">{{ fields.currency_select }}</option>
-          <option value="RUB">RUB</option>
-          <option value="USD">USD</option>
-          <option value="EUR">EUR</option>
+          <option value="USD" {% if values.currency == 'USD' %}selected{% endif %}>USD</option>
+          <option value="EUR" {% if values.currency == 'EUR' %}selected{% endif %}>EUR</option>
+          <option value="RUB" {% if values.currency == 'RUB' %}selected{% endif %}>RUB</option>
+          <option value="UAH" {% if values.currency == 'UAH' %}selected{% endif %}>RUB</option>
         </select>
         <div class="error">{{ fields.currency_error }}</div>
       </div>
+      
       <button type="submit">{{ buttons.submit }}</button>
+      
     </form>
   </div>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script>
+  <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
+<script defer>
 document.addEventListener('DOMContentLoaded', () => {
-  try {
-    console.log('DOM loaded, initializing WebApp…');
-    function adjustFont() {
-      const base = Math.max(window.innerWidth, window.innerHeight) / 35;
-      document.documentElement.style.fontSize = base + 'px';
+  // Функция подстройки шрифта
+  function adjustFont() {
+    const base = Math.max(window.innerWidth, window.innerHeight) / 35;
+    document.documentElement.style.fontSize = base + 'px';
+  }
+  adjustFont();
+  window.addEventListener('resize', adjustFont);
+
+  // Инициализация Telegram.WebApp
+  let tg = null;
+  if (window.Telegram && Telegram.WebApp) {
+    tg = Telegram.WebApp;
+    tg.ready();
+    try {
+      if (typeof tg.requestFullscreen === 'function') {
+        tg.requestFullscreen();
+      } else {
+        throw new Error('requestFullscreen не поддерживается');
+      }
+    } catch (errFs) {
+      console.warn('Fullscreen unsupported, using expand():', errFs);
+      try {
+        tg.expand();
+      } catch (errEx) {
+        console.warn('Expand тоже не прошёл:', errEx);
+      }
     }
-    adjustFont();
-    window.addEventListener('resize', adjustFont);
+    document.body.setAttribute('data-theme', tg.colorScheme || 'light');
+  } else {
+    console.warn('Telegram.WebApp не доступен — инициализация пропущена');
+  }
 
-    let tg = null;
-    if (window.Telegram && Telegram.WebApp) {
-      tg = Telegram.WebApp;
-      tg.ready();
-      try {
-        if (typeof tg.requestFullscreen === 'function') {
-          tg.requestFullscreen();
-        } else {
-          throw new Error('Метод requestFullscreen не найден');
-        }
-      } catch (errFs) {
-        console.warn('Fullscreen unsupported, using expand():', errFs);
-        try {
-          tg.expand();
-        } catch (errEx) {
-          console.warn('Expand тоже не прошёл:', errEx);
-        }
-      }
-      const theme = tg.colorScheme || 'light';
-      document.body.setAttribute('data-theme', theme);
-    } else {
-      console.warn('Telegram.WebApp не доступен — идём без него');
-    }
+  // Регистрация обработчика отправки формы
+  const form = document.getElementById('dataForm');
+  const fields = ['date','time','store','product','total','currency'];
 
-    console.log('Registering submit handler');
-    const form = document.getElementById('dataForm');
-    const fields = ['date','time','store','product','total','currency'];
+  form.addEventListener('submit', e => {
+    e.preventDefault();
 
-    form.addEventListener('submit', async e => {
-      e.preventDefault();
-      console.log('Form submit triggered');
-
-      let valid = true;
-      fields.forEach(id => {
-        const el = document.getElementById(id);
-        const isValid = el.checkValidity();
-        console.log(`Field “${id}”: value="${el.value}", valid=${isValid}`, el.validity);
-        if (!isValid) {
-          valid = false;
-          el.nextElementSibling.style.display = 'block';
-        } else {
-          el.nextElementSibling.style.display = 'none';
-        }
-      });
-      if (!valid) {
-        console.warn('Validation failed — см. выше список невалидных полей');
-        return;
-      }
-
-      const data = {};
-      fields.forEach(id => data[id] = document.getElementById(id).value);
-
-      let chatId = '';
-      try {
-        chatId = (tg && tg.initDataUnsafe?.user?.id) || '';
-      } catch(_) { /* ignore */ }
-      if (!chatId) {
-        const parts = window.location.pathname.split('/');
-        chatId = parts[parts.length - 1] || '';
-      }
-      data.chat_id = chatId;
-      console.log('Payload:', data);
-
-      try {
-        console.log('About to fetch /api/submit');
-        const res = await fetch('/api/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-        console.log('Fetch resolved with status', res.status);
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.message || res.statusText);
-        }
-        console.log('Submitted successfully');
-      } catch (errReq) {
-        console.error('Submit error:', errReq);
-      } finally {
-        if (tg) {
-          try {
-            // **Отправляем данные боту перед закрытием WebApp**
-            tg.sendData(JSON.stringify({
-              action: 'add_check',
-              ...data
-            }));
-            console.log('Telegram.WebApp.sendData() called with:', data);
-          } catch (errSend) {
-            console.warn('Error sending data to bot:', errSend);
-          }
-          setTimeout(() => {
-            try {
-              tg.close();
-              console.log('Telegram.WebApp.close() called');
-            } catch(errClose) {
-              console.warn('Error closing WebApp:', errClose);
-            }
-          }, 300);
-        }
+    // Валидация
+    let valid = true;
+    fields.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el.checkValidity()) {
+        valid = false;
+        el.nextElementSibling.style.display = 'block';
+      } else {
+        el.nextElementSibling.style.display = 'none';
       }
     });
+    if (!valid) return;
 
-  } catch (errInit) {
-    console.error('Initialization error:', errInit);
-  }
+    // Сбор данных
+    const data = {};
+    fields.forEach(id => data[id] = document.getElementById(id).value);
+
+    // Получение chat_id (сначала из tg.initDataUnsafe, иначе из URL)
+    let chatId = '';
+    try {
+      chatId = tg?.initDataUnsafe?.user?.id || '';
+    } catch {}
+    if (!chatId) {
+      const parts = window.location.pathname.split('/');
+      chatId = parts[parts.length - 1] || '';
+    }
+    data.chat_id = chatId;
+
+    // Запуск fetch без await — отправка в фоне
+    fetch('/check_form/api/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      keepalive: true
+    }).catch(err => console.error('Fetch error:', err));
+
+    // Сразу отправляем данные обратно в бота и закрываем WebApp
+    if (tg) {
+      tg.sendData(JSON.stringify({
+        action: 'add_check',
+        ...data
+      }));
+      tg.close();
+    }
+  });
+
 });
 </script>
 </body>

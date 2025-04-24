@@ -1,7 +1,7 @@
 import logging
 import asyncio
 import os
-from config import LOGGING_FILE_PATH, LOGGING_SETTINGS_TO_SEND
+from config.config import LOGGING_FILE_PATH, LOGGING_SETTINGS_TO_SEND
 _initialized = False
 
 # Updated to avoid circular imports
@@ -34,6 +34,27 @@ def set_info_bot(bot):
     global _info_bot
     _info_bot = bot
 
+
+async def send_info_msg(text=None, message_thread_id=None, info_bot=None, chat_id=None):
+    """
+    Function for sending a message to the logging bot
+    """
+    if chat_id is None:
+        chat_id = LOGGING_SETTINGS_TO_SEND["chat_id"]
+        
+    try:
+        # Only proceed if we have a bot instance
+        if info_bot is not None:
+            if LOGGING_SETTINGS_TO_SEND["permission"] and LOGGING_SETTINGS_TO_SEND["message_thread_id"] not in [None, 0]:
+                await info_bot.send_message(chat_id=chat_id, text=text, message_thread_id=LOGGING_SETTINGS_TO_SEND["message_thread_id"])
+            else:
+                await info_bot.send_message(chat_id=chat_id, text=text)
+        else:
+            # Log that we couldn't send the message due to missing bot instance
+            logging.warning("Could not send info message - info_bot instance not provided")
+    except Exception as e:
+        await log_info(f"Error sending message: {e}", type_e="error")
+
 async def log_info(message: str, type_e: str, *args, **kwargs: str):
     await init_logging()
     if "info" in type_e:  
@@ -41,7 +62,6 @@ async def log_info(message: str, type_e: str, *args, **kwargs: str):
     elif "error" in type_e:
         logging.error(message, *args, extra=kwargs)
         # Import here to avoid circular import
-        from services.utils import send_info_msg
         await send_info_msg(
             text=f'Type message: Error\n{message}\n{args}\n{kwargs}', 
             message_thread_id=LOGGING_SETTINGS_TO_SEND["message_thread_id"],
@@ -50,7 +70,6 @@ async def log_info(message: str, type_e: str, *args, **kwargs: str):
     elif "warning" in type_e:
         logging.warning(message, *args, extra=kwargs)
         # Import here to avoid circular import
-        from services.utils import send_info_msg
         await send_info_msg(
             text=f'Type message: Warning\n{message}\n{args}\n{kwargs}', 
             message_thread_id=LOGGING_SETTINGS_TO_SEND["message_thread_id"],

@@ -1,12 +1,11 @@
-import json
 from aiogram import types, F, Router
 from aiogram.enums import ChatType, ParseMode
 from aiogram.enums.content_type import ContentType
 from aiogram.types import Message
 from services.db_utils import update_user_data, read_user_all_data, write_user_to_json
-from config import BOT_USERNAME, DEFAULT_LANGUAGES, CHECKS_ANALYTICS, MESSAGES
-from handlers.callbacks import get_persistent_menu, get_continue_add_check_accept_inline
-from logs import log_info
+from config.config import BOT_USERNAME, DEFAULT_LANGUAGES, CHECKS_ANALYTICS, MESSAGES
+from keyboards.reply_kb import get_persistent_menu
+from logs.log import log_info
 from services.user_service import handle_message
 
 messages_router = Router()

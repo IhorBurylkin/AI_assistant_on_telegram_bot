@@ -9,29 +9,9 @@ import cv2
 import os
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
-from logs import log_info
-from config import WHITE_LIST, LOGGING_SETTINGS_TO_SEND, PRODUCT_KEYS, PRODUCT_KEYS_FOR_PARSE, MESSAGES
+from logs.log import log_info
+from config.config import WHITE_LIST, PRODUCT_KEYS, PRODUCT_KEYS_FOR_PARSE, MESSAGES
 from services.db_utils import update_user_data
-
-async def send_info_msg(text=None, message_thread_id=None, info_bot=None, chat_id=None):
-    """
-    Function for sending a message to the logging bot
-    """
-    if chat_id is None:
-        chat_id = LOGGING_SETTINGS_TO_SEND["chat_id"]
-        
-    try:
-        # Only proceed if we have a bot instance
-        if info_bot is not None:
-            if LOGGING_SETTINGS_TO_SEND["permission"] and LOGGING_SETTINGS_TO_SEND["message_thread_id"] not in [None, 0]:
-                await info_bot.send_message(chat_id=chat_id, text=text, message_thread_id=LOGGING_SETTINGS_TO_SEND["message_thread_id"])
-            else:
-                await info_bot.send_message(chat_id=chat_id, text=text)
-        else:
-            # Log that we couldn't send the message due to missing bot instance
-            print(f"Warning: Could not send info message - info_bot instance not provided")
-    except Exception as e:
-        await log_info(f"Error sending message: {e}", type_e="error")
 
 async def count_tokens_for_user_text(text: str, model: str = "o200k_base") -> int:
     """
@@ -300,7 +280,7 @@ async def open_cv_image_processing(image_path):
     # Specify path to your image (receipt)
     try:
         image_processed_path = await process_and_save_receipt(image_path)
-        print("Processed image saved at path:", image_processed_path)
+        await log_info(f"Processed image saved at path: {image_processed_path}", type_e="info")
         return image_processed_path
     except Exception as e:
         await log_info(f"Error processing image: {e}", type_e="error")

@@ -11,7 +11,7 @@ from config.config import (
     TELEGRAM_BOT_TOKEN_ALTERNATIVE,
     TELEGRAM_INFO_BOT_TOKEN_ALTERNATIVE,
 )
-from logs import log_info, set_info_bot
+from logs.log import log_info, set_info_bot
 
 # Initialize global variables
 bot = None

@@ -30,12 +30,13 @@ def get_settings(file_path: str):
     return load_config(file_path)  
 
 config = get_settings("config/config.json")
+lang_dict = get_settings("config/lang_dict.json")
 
 CHATGPT_MODEL = config.get("CHATGPT_MODEL")
 CONFIG_FILE_PATH = config.get("CONFIG_FILE_PATH")
-USERS_FILE_PATH = "chat_ids"#config.get("USERS_FILE_PATH")
+USERS_FILE_PATH = "chat_ids"
 CHECKS_ANALYTICS = "checks_analytics"
-CHAT_HISTORIES_FILE_PATH = "context"#config.get("CHAT_HISTORIES_FILE_PATH")
+CHAT_HISTORIES_FILE_PATH = "context"
 LOGGING_FILE_PATH = config.get("LOGGING_FILE_PATH")
 LOGGING_SETTINGS_TO_SEND = config.get("LOGGING_SETTINGS_TO_SEND")
 TELEGRAM_BOT_TOKEN = config.get("TELEGRAM_BOT_TOKEN")
@@ -57,9 +58,10 @@ DEFAULT_LANGUAGES = config.get("DEFAULT_LANGUAGES")
 MODELS = config.get("MODELS")
 MODELS_FOR_MENU = config.get("MODELS_FOR_MENU")
 MODELS_TEXT = config.get("MODELS_TEXT")
-MESSAGES = config.get("MESSAGES")
 WHITE_LIST = config.get("white_list")
 DB_DSN = config.get("DB_DSN")
+
+MESSAGES = lang_dict.get("MESSAGES")
 
 LIMITS = {
         "default_list": [10, 1000],

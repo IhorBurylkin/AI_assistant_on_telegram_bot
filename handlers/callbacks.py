@@ -1,13 +1,18 @@
 import requests
+import bot_instance
+from datetime import datetime, date, timedelta
+from dateutil.relativedelta import relativedelta
 from aiogram import types, Router, F
 from aiogram.enums import ChatType, ParseMode
 from services.db_utils import read_user_all_data, update_user_data, clear_user_context, update_checks_analytics_columns, write_user_to_json
 from services.utils import get_current_datetime, dict_to_str, map_keys, split_str_to_dict
-from config import MESSAGES, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGES, CHECKS_ANALYTICS, CHATGPT_MODEL
+from config.config import MESSAGES, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGES, CHECKS_ANALYTICS, CHATGPT_MODEL
 from aiogram.types import ForceReply
 from aiogram.fsm.context import FSMContext
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.types.input_file import InputFile as AbstractInputFile
 from io import BytesIO
-from logs import log_info
+from logs.log import log_info
 from services.user_service import handle_message
 from keyboards.reply_kb import get_persistent_menu
 from keyboards.inline_kb import (
@@ -24,23 +29,21 @@ from keyboards.inline_kb import (
     get_add_check_inline,
     get_add_check_accept_inline,
     get_continue_add_check_accept_inline,
-    get_calendar
+    create_day_keyboard,
+    get_check_report_inline
     ) 
-from aiogram.exceptions import TelegramBadRequest
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.types.input_file import InputFile as AbstractInputFile
+from handlers.callbacks_data import (
+    PromptState,
+    CheckState,
+    DateCB,
+    PeriodCB,
+    CustomPeriod
+    )
 
 callbacks_router = Router()
 
 message_to_db = {}
 list_of_dict = []
-
-class CheckState(StatesGroup):
-    waiting_for_input = State()
-    check_data = State()
-
-class PromptState(StatesGroup):
-    waiting_for_input = State()
 
 class MemoryInputFile(AbstractInputFile):
     def __init__(self, file: BytesIO, filename: str):
@@ -188,14 +191,9 @@ async def process_options_callback(query: types.CallbackQuery, state: FSMContext
 
         elif data == "accept":
             await state.clear()
-            #dict_for_db = await map_keys(message_to_db, chat_id, lang)
             list_of_dict_for_db = await map_keys(list_of_dict, chat_id, lang)
             for dict_to_db in list_of_dict_for_db:
-                #dict_for_db['product'] = await split_str_to_dict(dict_for_db['product'], split_only_line=True)
                 await write_user_to_json(CHECKS_ANALYTICS, dict_to_db)
-            #print(dict_for_db)
-            #dict_for_db['product'] = await split_str_to_dict(dict_for_db['product'], split_only_line=True)
-            #await write_user_to_json(CHECKS_ANALYTICS, dict_for_db)
             persistent_menu = await get_persistent_menu(chat_id)
             await query.message.answer(text=MESSAGES[lang]['inline_kb']['options']['accept'], reply_markup=persistent_menu)
             await query.message.delete()
@@ -204,6 +202,7 @@ async def process_options_callback(query: types.CallbackQuery, state: FSMContext
                 MESSAGES[lang]['inline_kb']['options']['continue'],
                 reply_markup=continue_add_check_accept_inline
             )
+            await update_user_data(chat_id, "message_id", 0)
             return
 
         elif data == "cancel":
@@ -227,6 +226,7 @@ async def process_options_callback(query: types.CallbackQuery, state: FSMContext
             await state.clear()
             await query.message.delete()
             await query.answer()
+            await update_user_data(chat_id, "message_id", 0)
             return
 
         await log_info(f"Options callback processed for chat_id {chat_id} with data: {data}", type_e="info")
@@ -244,6 +244,7 @@ async def handle_text_input(message: types.Message, state: FSMContext):
 
     user_data = await read_user_all_data(chat_id)
     lang = user_data.get("language") or DEFAULT_LANGUAGES
+    struckture_data = MESSAGES[lang]['check_struckture_data']
     
     if message.content_type == types.ContentType.TEXT:
         # Process request through handle_message function (generation_type="image")
@@ -298,19 +299,67 @@ async def handle_text_input(message: types.Message, state: FSMContext):
             parse_mode=ParseMode.HTML
         )
     elif message.content_type == types.ContentType.DOCUMENT:
-        # Process request through handle_message function (generation_type="check")
-        return_message = await handle_message(message, generation_type="check", ai_handler="api_vision")
-        # Assuming handle_message returns a tuple (message, chat_id)
-        message_to_db, new_chat_id, list_of_dict = return_message[0], return_message[1], return_message[2]
-        message_to = await dict_to_str(message_to_db)
-        persistent_menu = await get_persistent_menu(new_chat_id)
-        inline_add_check_accept_kb = await get_add_check_accept_inline(new_chat_id)
-        await message.answer(
-            text=message_to,
-            reply_markup=inline_add_check_accept_kb,
-            parse_mode=ParseMode.HTML
-        )
+        try:
+            # Process request through handle_message function (generation_type="check")
+            return_message = await handle_message(message, generation_type="check", ai_handler="api_vision")
+            # Assuming handle_message returns a tuple (message, chat_id)
+            message_to_db, new_chat_id, list_of_dict = return_message[0], return_message[1], return_message[2]
+            message_to_web_app = [message_to_db[k] for k in struckture_data]
+            message_to = await dict_to_str(message_to_db)
+            persistent_menu = await get_persistent_menu(new_chat_id)
+            inline_add_check_accept_kb = await get_add_check_accept_inline(new_chat_id, message_to_web_app)
+            message_sended = await message.answer(
+                text=message_to,
+                reply_markup=inline_add_check_accept_kb,
+                parse_mode=ParseMode.HTML
+            )
+            await update_user_data(chat_id, "message_id", message_sended.message_id)
+        except Exception as e:
+            await log_info(f"Error processing document message: {e}", type_e="error")
     await state.clear()
+
+async def process_user_input_list(user_text_input: list):
+    global message_to_db, list_of_dict
+    try:
+        chat_id = user_text_input[6]
+        user_text_input.pop()
+        user_data = await read_user_all_data(chat_id)
+        lang = user_data.get("language") or DEFAULT_LANGUAGES
+        message_id_for_deletion = user_data.get("message_id") or None
+        struckture_data = MESSAGES[lang]['check_struckture_data']
+        if bot_instance.bot is None:
+            await bot_instance.initialize_bots()
+        if message_id_for_deletion and message_id_for_deletion != 0:
+            try:
+                await bot_instance.bot.delete_message(
+                chat_id=chat_id, 
+                message_id=message_id_for_deletion
+            )
+            except TelegramBadRequest as e:
+                await log_info(f"Error deleting message with ID {message_id_for_deletion}: {e}", type_e="error")
+
+        message_raw = "\n".join(f"{key}: {user_text_input[i]}" for i, key in enumerate(struckture_data))
+        temporary_message = await bot_instance.bot.send_message(
+            chat_id=chat_id, 
+            text=f"Data received, processing...\n{message_raw}", 
+            parse_mode=ParseMode.HTML)
+        
+        return_message = await handle_message(message = temporary_message, generation_type="check", user_input_list=user_text_input)
+        await bot_instance.bot.delete_message(
+            chat_id=chat_id, 
+            message_id=temporary_message.message_id
+        )    
+        message_to_db, new_chat_id, list_of_dict = return_message[0], return_message[1], return_message[2]
+        message_to_web_app = [message_to_db[k] for k in struckture_data]
+        message_to = await dict_to_str(message_to_db)
+        inline_add_check_accept_kb = await get_add_check_accept_inline(new_chat_id, message_to_web_app)
+        message_sended = await bot_instance.bot.send_message(chat_id=chat_id, text=message_to, reply_markup=inline_add_check_accept_kb, parse_mode=ParseMode.HTML)
+        await update_user_data(chat_id, "message_id", message_sended.message_id)
+        
+        await log_info(f"User input list processed for chat_id {chat_id}", type_e="info")
+    except Exception as e:
+        await log_info(f"Error processing user input list for chat_id {chat_id}: {e}", type_e="error")
+        raise
 
 @callbacks_router.callback_query(lambda call: call.data.startswith("profile:"))
 async def process_profile_callback(query: types.CallbackQuery):
@@ -335,9 +384,9 @@ async def process_profile_callback(query: types.CallbackQuery):
             inline_profile_kb = await get_profile_inline(chat_id)
             await query.message.edit_text(MESSAGES[lang]['inline_kb']['profile']['profile_title'], reply_markup=inline_profile_kb)
             await query.answer()
-        elif data == "calendar":
-            inline_calendar_kb = await get_calendar(chat_id)
-            await query.message.edit_text(MESSAGES[lang]['inline_kb']['profile']['calendar'], reply_markup=inline_calendar_kb)
+        elif data == "check_report":
+            inline_calendar_kb = await get_check_report_inline(chat_id)
+            await query.message.edit_text(MESSAGES[lang]['inline_kb']['profile']['check_report_title'], reply_markup=inline_calendar_kb)
             await query.answer()
 
         await log_info(f"Profile callback processed for chat_id {chat_id} with data: {data}", type_e="info")
@@ -645,3 +694,94 @@ async def process_generation_image_callback(query: types.CallbackQuery):
     except Exception as e:
         await log_info(f"[DALL·E] Error in process_generation_image_callback for chat_id {chat_id}: {e}", type_e="error")
         raise
+
+@callbacks_router.callback_query(DateCB.filter())
+async def on_date_cb(query: types.CallbackQuery, callback_data: DateCB, state: FSMContext):
+    """ Handle date selection in calendar. """
+    chat_id = query.message.chat.id if query.message.chat.type == ChatType.PRIVATE else query.from_user.id
+    user_data = await read_user_all_data(chat_id)
+    lang = user_data.get("language") or DEFAULT_LANGUAGES
+
+    action = callback_data.action
+    year = callback_data.year
+    month = callback_data.month
+    day = callback_data.day
+    current_state = await state.get_state()
+
+    if action in ("prev_month", "next_month"):
+        kb = await create_day_keyboard(year, month, chat_id, lang)
+        await query.message.edit_reply_markup(reply_markup=kb)
+
+    if current_state == CustomPeriod.waiting_for_start and callback_data.action == "set_day":
+        start = f"{callback_data.year}-{callback_data.month:02d}-{callback_data.day:02d}"
+        await state.update_data(start_date=start)
+
+        # Переходим к выбору end_date
+        await state.set_state(CustomPeriod.waiting_for_end)
+        await query.message.edit_text(MESSAGES[lang]['calendar']['end_date'])
+        kb = await create_day_keyboard(
+            year = callback_data.year,
+            month= callback_data.month,
+            chat_id= chat_id,
+            lang = lang
+        )
+        await query.message.edit_reply_markup(reply_markup=kb)
+        await query.answer()
+        return
+    
+    if current_state == CustomPeriod.waiting_for_end and callback_data.action == "set_day":
+        end = f"{callback_data.year}-{callback_data.month:02d}-{callback_data.day:02d}"
+        data = await state.get_data()
+        start = data.get("start_date")
+
+        await state.clear()  # выходим из FSM
+
+        # Финальный ответ / запуск отчёта
+        await query.message.edit_text(f"{MESSAGES[lang]['calendar']['selected_period']}".format(start, end))
+        # … здесь вызывайте вашу логику формирования отчёта …
+
+        await query.answer()
+
+    await query.answer()
+
+@callbacks_router.callback_query(PeriodCB.filter(F.mode == "preset"))
+async def preset_handler(query: types.CallbackQuery, callback_data: PeriodCB):
+    today = date.today()
+    match callback_data.value:
+        case "today":
+            start, end = today, today
+        case "week":
+            start, end = today - timedelta(days=6), today
+        case "current_month":
+            start = today.replace(day=1)
+            end   = today
+        case "last_month":
+            start = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+            end   = today.replace(day=1) - timedelta(days=1)
+        case "year":
+            start = today - relativedelta(years=1)
+            end   = today
+    await query.message.edit_text(
+        f"📅 <b>Период:</b> {start:%d.%m.%Y} – {end:%d.%m.%Y}\n"
+        "⏳ Формирую отчёт…"
+    )
+    await query.answer()
+
+@callbacks_router.callback_query(PeriodCB.filter((F.mode == "custom") & (F.value == "your_period")))
+async def custom_start_handler(query: types.CallbackQuery, callback_data: PeriodCB, state: FSMContext):
+    chat_id = query.message.chat.id if query.message.chat.type == ChatType.PRIVATE else query.from_user.id
+    user_data = await read_user_all_data(chat_id)
+    lang = user_data.get("language") or DEFAULT_LANGUAGES
+
+    await state.set_state(CustomPeriod.waiting_for_start)
+
+    # Редактируем сообщение и выводим календарь
+    await query.message.edit_text(MESSAGES[lang]['calendar']['start_date'])
+    kb = await create_day_keyboard(
+        year = datetime.now().year,
+        month= datetime.now().month,
+        chat_id = chat_id,
+        lang = lang
+    )
+    await query.message.edit_reply_markup(reply_markup=kb)
+    await query.answer()
