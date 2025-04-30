@@ -179,6 +179,10 @@ cython_debug/
 # Image files
 *.jpg
 
+# Voice files
+*.wav
+*.ogg
+
 # PyPI configuration file
 .pypirc
 
