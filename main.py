@@ -13,10 +13,10 @@ from services import sysmonitoring, telegram_bot_init, db_utils
 from handlers import callbacks_settings, callbacks_options, callbacks_profile, commands, messages
 from logs.log import logs
 from pathlib import Path
-from asgiref.wsgi import WsgiToAsgi
 from hypercorn.asyncio import serve
 from hypercorn.config import Config
 from hypercorn.middleware import ProxyFixMiddleware
+from config.config import DEBUG_WEBAPP
 
 async def set_commands(bot):
     """Set bot commands for different scopes"""
@@ -57,6 +57,7 @@ async def run_web_app(shutdown_event: asyncio.Event):
     DJANGO_PROJECT_ROOT = BASE_DIR / "webapp"
     sys.path.insert(0, str(DJANGO_PROJECT_ROOT))
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "webapp.settings")
+    await logs(f"Web server has Debug mode: {DEBUG_WEBAPP}", type_e="info")
     django.setup()
 
     from webapp.asgi import application
@@ -130,8 +131,6 @@ async def main():
         daemon=True
         )
         th.start()
-
-        await logs("All services started", type_e="info")
 
         await shutdown_event.wait()
         await logs("Shutdown signal received", type_e="info")

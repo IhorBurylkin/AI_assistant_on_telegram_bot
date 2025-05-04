@@ -23,8 +23,6 @@ async def text_message_ai_response(chat_id, lang, user_model, context_enabled, w
             conversation_api.extend(user_text_saved)
 
         flagged, categories = await openai_api_text_moderations(user_text)
-        print(f"\n\nModeration result: {flagged}, {categories}\n\n", type(categories))
-        print(list(categories))
         if flagged == False:
             if user_model in MODELS_OPEN_AI:
                 ai_response, usage_tokens = await openai_api_text_request(lang, user_model, set_answer, web_enabled, conversation_api)

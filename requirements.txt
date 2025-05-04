@@ -25,3 +25,4 @@ pandas==2.2.3
 python-dotenv==1.1.0
 rich==14.0.0  # For console output in sysmonitoring
 psutil==7.0.0  # System monitoring
+setuptools==80.3.0

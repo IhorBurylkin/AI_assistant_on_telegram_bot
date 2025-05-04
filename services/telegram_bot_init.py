@@ -7,9 +7,7 @@ from aiogram.enums import ParseMode
 from telebot.apihelper import ApiTelegramException
 from config.config import (
     TELEGRAM_BOT_TOKEN,
-    TELEGRAM_INFO_BOT_TOKEN,
-    TELEGRAM_BOT_TOKEN_ALTERNATIVE,
-    TELEGRAM_INFO_BOT_TOKEN_ALTERNATIVE,
+    TELEGRAM_INFO_BOT_TOKEN
 )
 from logs.log import logs, set_info_bot
 
@@ -24,23 +22,6 @@ async def create_bot(token, parse_mode=ParseMode.HTML):
     session = AiohttpSession()
     return Bot(token=token, session=session, default=DefaultBotProperties(parse_mode=parse_mode))
 
-
-async def test_polling(token: str) -> bool:
-    try:
-        await logs(f"Testing token {token} for polling", type_e="info")
-        bot = telebot.TeleBot(token, parse_mode=ParseMode.HTML)
-        bot.remove_webhook()
-        bot.get_updates(limit=1, timeout=1)
-        await logs(f"Token {token} is available for polling", type_e="info")
-        return True
-    except ApiTelegramException as e:
-        if e.error_code == 409:
-            await logs(f"Token {token} has webhook conflict", type_e="warning")
-            return False
-        else:
-            await logs(f"Module: telegram__bot_init. Error testing polling: {e}", type_e="error")
-            return False
-
 async def initialize_bots():
     """Initialize bots with direct polling test"""
     global bot, dp, info_bot, dp_info_bot
@@ -51,12 +32,6 @@ async def initialize_bots():
     # Test main bot tokens
     main_token = TELEGRAM_BOT_TOKEN
     info_token = TELEGRAM_INFO_BOT_TOKEN
-    if not await test_polling(main_token):
-        await logs("Main token conflict and no connection, using alternative", type_e="warning")
-        if not await test_polling(info_token):
-            await logs("Info token has conflict, trying alternative", type_e="warning")
-            main_token = TELEGRAM_BOT_TOKEN_ALTERNATIVE
-            info_token = TELEGRAM_INFO_BOT_TOKEN_ALTERNATIVE
     
     # Create bots with selected tokens
     bot = await create_bot(main_token)

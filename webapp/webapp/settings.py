@@ -2,7 +2,7 @@ import os
 import dj_database_url
 from pathlib import Path
 from urllib.parse import urlparse
-from config.config import WEBAPP_URL, DB_DSN
+from config.config import WEBAPP_URL, DB_DSN, DEBUG_WEBAPP
 from django.core.management.utils import get_random_secret_key
 
 secret_key = os.environ.get("SECRET_KEY")
@@ -23,7 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ["SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = DEBUG_WEBAPP
 
 ALLOWED_HOSTS = [host, "localhost", "127.0.0.1", "0.0.0.0"]
 

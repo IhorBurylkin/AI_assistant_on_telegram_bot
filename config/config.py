@@ -1,6 +1,7 @@
 from functools import lru_cache
 import json
 from pathlib import Path
+from setuptools._distutils.util import strtobool
 
 def load_config(file_path: str):
     """
@@ -59,11 +60,10 @@ CHAT_HISTORIES_FILE_PATH = "context"
 LOGGING_FILE_PATH = config.get("LOGGING_FILE_PATH")
 LOGGING_SETTINGS_TO_SEND = config.get("LOGGING_SETTINGS_TO_SEND")
 TELEGRAM_BOT_TOKEN = config.get("TELEGRAM_BOT_TOKEN")
-TELEGRAM_BOT_TOKEN_ALTERNATIVE = config.get("TELEGRAM_BOT_TOKEN_ALTERNATIVE")
 TELEGRAM_INFO_BOT_TOKEN = config.get("TELEGRAM_INFO_BOT_TOKEN")
-TELEGRAM_INFO_BOT_TOKEN_ALTERNATIVE = config.get("TELEGRAM_INFO_BOT_TOKEN_ALTERNATIVE")
 BOT_USERNAME = config.get("BOT_USERNAME")
 WEBAPP_URL = config.get("WEBAPP_URL")
+DEBUG_WEBAPP = bool(strtobool(config.get("DEBUG_WEBAPP", "False")))
 OPENAI_API_KEY = config.get("OPENAI_API_KEY")
 DEEPSEEK_API_KEY = config.get("DEEPSEEK_API_KEY")
 GEMINI_API_KEY = config.get("GEMINI_API_KEY")
