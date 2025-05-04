@@ -1,5 +1,6 @@
 from functools import lru_cache
 import json
+from pathlib import Path
 
 def load_config(file_path: str):
     """
@@ -21,15 +22,33 @@ def load_config(file_path: str):
     except Exception as e:
         print(f"Module: config. Unexpected error when loading {file_path}: {e}")
         return
+    
+def find_file(path: str, path_server: str):
+    p_local = Path(path)
+    if p_local.exists():
+        return p_local
 
-@lru_cache(maxsize=2)
+    p_server = Path(path_server)
+    if p_server.exists():
+        return p_server
+    
+@lru_cache(maxsize=3)
 def get_settings(file_path: str):
     """
     Loads settings once and caches the result.
     """
     return load_config(file_path)  
 
-config = get_settings("config/config.json")
+config_path = get_settings("config/config_path.json")
+path_main = config_path.get("config_path")
+path_server = config_path.get("config_path_server")
+
+try:
+    path = find_file(path_main, path_server)
+except FileNotFoundError as err:
+    print("File not fiund.", err)
+
+config = get_settings(path)
 lang_dict = get_settings("config/lang_dict.json")
 
 CHATGPT_MODEL = config.get("CHATGPT_MODEL")
