@@ -1,5 +1,5 @@
 from logs.log import logs
-from ai_handlers.open_ai import openai_api_text_request
+from ai_handlers.open_ai import openai_api_text_request, openai_api_text_moderations
 from ai_handlers.deepseek import deepseek_api_text_request
 from services.db_utils import update_chat_history, read_chat_history, update_user_data
 from config.config import MODELS_OPEN_AI, MODELS_DEEPSEEK, MESSAGES
@@ -21,10 +21,20 @@ async def text_message_ai_response(chat_id, lang, user_model, context_enabled, w
             conversation_api.extend(await read_chat_history(chat_id))
         else:
             conversation_api.extend(user_text_saved)
-        if user_model in MODELS_OPEN_AI:
-            ai_response, usage_tokens = await openai_api_text_request(lang, user_model, set_answer, web_enabled, conversation_api)
-        elif user_model in MODELS_DEEPSEEK:
-            ai_response, usage_tokens = await deepseek_api_text_request(lang, user_model, set_answer, web_enabled, conversation_api)
+
+        flagged, categories = await openai_api_text_moderations(user_text)
+        print(f"\n\nModeration result: {flagged}, {categories}\n\n", type(categories))
+        print(list(categories))
+        if flagged == False:
+            if user_model in MODELS_OPEN_AI:
+                ai_response, usage_tokens = await openai_api_text_request(lang, user_model, set_answer, web_enabled, conversation_api)
+            elif user_model in MODELS_DEEPSEEK:
+                ai_response, usage_tokens = await deepseek_api_text_request(lang, user_model, set_answer, web_enabled, conversation_api)
+        else:
+            true_categories = [name for name, flag in categories if flag]
+            ai_response = MESSAGES.get(lang, {}).get("error_moderations", 
+                "Unfortunately, your message was rejected by the moderation system. Please try rephrasing it and try again.  \nCategory: {}").format("".join(true_categories))
+            usage_tokens = 0
 
         await logs(f"Chat {chat_id} - model response received: {ai_response}", type_e="info")
         await update_chat_history(chat_id, {"role": "assistant", "content": ai_response})

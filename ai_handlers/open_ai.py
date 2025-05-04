@@ -10,6 +10,48 @@ from logs.errors import OpenAIServiceError
 
 client = AsyncOpenAI(api_key=OPENAI_API_KEY, base_url="https://api.openai.com/v1")
 
+async def openai_api_text_moderations(text):
+    try:
+        response = await client.moderations.create(
+            input=text,
+            model="omni-moderation-latest"
+        )
+        return response.results[0].flagged, response.results[0].categories
+    except openai.APIError as e:
+        await logs(f"Error in openai_api_text_moderations: {e}", type_e="error")
+        raise OpenAIServiceError(
+            status_code=e.status_code,
+            code=getattr(e, "code", None),
+            message=str(e),
+            original=e
+        ) from e
+    
+async def openai_api_photo_moderations(image_path, user_text):
+    try:
+        with open(image_path, "rb") as image_file:
+                base64_image = base64.b64encode(image_file.read()).decode("utf-8")
+        response = await client.moderations.create(
+            model="omni-moderation-latest",
+            input=[
+                {"type": "text", "text": f"{user_text}"},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        f"data:image/jpeg;base64,{base64_image}"
+                    }
+                },
+            ],
+        )
+        return response.results[0].flagged, response.results[0].categories
+    except openai.APIError as e:
+        await logs(f"Error in openai_api_photo_moderations: {e}", type_e="error")
+        raise OpenAIServiceError(
+            status_code=e.status_code,
+            code=getattr(e, "code", None),
+            message=str(e),
+            original=e
+        ) from e
+
 async def openai_api_text_request(lang, user_model, set_answer, web_enabled, conversation) -> str:
     """
     Function to process text messages and get AI response using OpenAI API.

@@ -1,7 +1,6 @@
-import base64
 from logs.log import logs
 from services.db_utils import update_chat_history, read_chat_history, update_user_data
-from ai_handlers.open_ai import openai_api_photo_request
+from ai_handlers.open_ai import openai_api_photo_request, openai_api_photo_moderations
 from config.config import MODELS_OPEN_AI, MODELS_DEEPSEEK, MESSAGES
 from logs.errors import OpenAIServiceError, ApplicationError
 
@@ -21,10 +20,19 @@ async def photo_message_ai_response(chat_id, lang, user_model, context_enabled, 
             conversation_api.extend(await read_chat_history(chat_id))
         else:
             conversation_api.extend(user_text_saved)
-        if user_model in MODELS_OPEN_AI:
-            ai_response, usage_tokens = await openai_api_photo_request(lang, user_model, set_answer, web_enabled, conversation_api, image_path)
-        elif user_model in MODELS_DEEPSEEK:
-            return f"<b>System: </b>{MESSAGES.get(lang, {}).get('error_422', 'An error occurred')}"
+
+        flagged, categories = await openai_api_photo_moderations(image_path, user_text)
+        if flagged == False:
+            if user_model in MODELS_OPEN_AI:
+                ai_response, usage_tokens = await openai_api_photo_request(lang, user_model, set_answer, web_enabled, conversation_api, image_path)
+            elif user_model in MODELS_DEEPSEEK:
+                return f"<b>System: </b>{MESSAGES.get(lang, {}).get('error_422', 'An error occurred')}"
+        else:
+            true_categories = [name for name, flag in categories if flag]
+            ai_response = MESSAGES.get(lang, {}).get("error_moderations", 
+                "Unfortunately, your message was rejected by the moderation system. Please try rephrasing it and try again.  \nCategory: {}").format("".join(true_categories))
+            usage_tokens = 0
+
         await logs(f"Chat {chat_id} - model response received: {ai_response}", type_e="info")
         await update_chat_history(chat_id, {"role": "assistant", "content": ai_response})
 

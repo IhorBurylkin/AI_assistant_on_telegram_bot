@@ -1,5 +1,5 @@
 from logs.log import logs
-from ai_handlers.open_ai import openai_api_generate_image
+from ai_handlers.open_ai import openai_api_generate_image, openai_api_text_moderations
 from services.db_utils import update_user_data
 from config.config import MODELS_OPEN_AI, MODELS_DEEPSEEK, MESSAGES
 from logs.errors import OpenAIServiceError, ApplicationError
@@ -12,10 +12,16 @@ async def generate_image_ai_response(chat_id, lang, user_model, resolution, qual
     """
     try:
         await logs(f"Chat {chat_id} - user request to image generate", type_e="info")
-        if user_model in MODELS_OPEN_AI:
-            ai_response = await openai_api_generate_image(lang, user_model, resolution, quality, user_text)
-        elif user_model in MODELS_DEEPSEEK:
-            return f"<b>System: </b>{MESSAGES.get(lang, {}).get('error_422', 'An error occurred')}"
+        flagged, categories = await openai_api_text_moderations(user_text)
+        if flagged == False:
+            if user_model in MODELS_OPEN_AI:
+                ai_response = await openai_api_generate_image(lang, user_model, resolution, quality, user_text)
+            elif user_model in MODELS_DEEPSEEK:
+                return f"<b>System: </b>{MESSAGES.get(lang, {}).get('error_422', 'An error occurred')}"
+        else:
+            true_categories = [name for name, flag in categories if flag]
+            ai_response = MESSAGES.get(lang, {}).get("error_moderations", 
+                "Unfortunately, your message was rejected by the moderation system. Please try rephrasing it and try again.  \nCategory: {}").format("".join(true_categories))
 
         tokens, req_count, date_requests = user_limits
         tokens += 0
