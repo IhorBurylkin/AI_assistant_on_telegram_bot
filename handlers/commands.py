@@ -57,7 +57,7 @@ async def send_welcome(message: types.Message):
             }
             await write_user_to_json(USERS_FILE_PATH, user_data)
             await logs(f"Created new user {chat_id} with chat_id {chat_id}", type_e="info")
-            await send_info_msg(text=f'Type message: Info\nNew user: {user_data["username"]}\nUser ID: {user_data["chat_id"]}', message_thread_id=LOGGING_SETTINGS_TO_SEND["message_thread_id"])
+            await send_info_msg(text=f'Type message: Info\nNew user: {user_data["username"]}\nUser ID: {user_data["user_id"]}', message_thread_id=LOGGING_SETTINGS_TO_SEND["message_thread_id"])
         
         # Send message based on chat type
         if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:

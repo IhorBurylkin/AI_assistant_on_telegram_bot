@@ -169,6 +169,35 @@ def validate_identifier(name):
 #_____________________________________________________________
 #_______________________READ_FUNCTIONS________________________
 #_____________________________________________________________
+async def user_exists(user_id: int) -> bool:
+    """
+    Asynchronous function to check if user_id exists in the PostgreSQL database.
+    
+    Parameters:
+      user_id: int - identifier of the user to find.
+      
+    Returns:
+      True if the user is found, False if the user doesn't exist or an error occurred.
+    """
+    connection = None
+    try:
+        connection = await get_connection()
+        # Execute a query to check if the user exists.
+        # Here the table is called "chat_ids", and it's assumed to have a "user_id" column.
+        query = "SELECT 1 FROM chat_ids WHERE user_id = $1 LIMIT 1;"
+        result = await connection.fetchval(query, user_id)
+        
+        await logs(f"Check for user_id {user_id} in chat_ids table completed successfully", type_e="info")
+        
+        # If result is not None, the user was found.
+        return True if result else False
+    except Exception as e:
+        await logs(f"Error checking for user {user_id}: {e}", type_e="error")
+        return False
+    finally:
+        if connection:
+            await release_connection(connection)
+
 async def read_user_all_data(chat_id: int):
     """
     Asynchronously queries data from the "chat_ids" table in PostgreSQL for the specified chat_id.
@@ -291,35 +320,6 @@ async def read_with_period(chat_id: int, start_date: str, end_date: str):
 #_____________________________________________________________
 #______________________WRITE_FUNCTIONS________________________
 #_____________________________________________________________
-async def user_exists(user_id: int) -> bool:
-    """
-    Asynchronous function to check if user_id exists in the PostgreSQL database.
-    
-    Parameters:
-      user_id: int - identifier of the user to find.
-      
-    Returns:
-      True if the user is found, False if the user doesn't exist or an error occurred.
-    """
-    connection = None
-    try:
-        connection = await get_connection()
-        # Execute a query to check if the user exists.
-        # Here the table is called "chat_ids", and it's assumed to have a "user_id" column.
-        query = "SELECT 1 FROM chat_ids WHERE user_id = $1 LIMIT 1;"
-        result = await connection.fetchval(query, user_id)
-        
-        await logs(f"Check for user_id {user_id} in chat_ids table completed successfully", type_e="info")
-        
-        # If result is not None, the user was found.
-        return True if result else False
-    except Exception as e:
-        await logs(f"Error checking for user {user_id}: {e}", type_e="error")
-        return False
-    finally:
-        if connection:
-            await release_connection(connection)
-
 async def clear_user_context(chat_id: int):
     """
     Asynchronous function for clearing a user's context in the "context" table of PostgreSQL.

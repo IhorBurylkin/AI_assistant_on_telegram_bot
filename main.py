@@ -11,7 +11,7 @@ import django
 from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats, BotCommandScopeAllGroupChats
 from services import sysmonitoring, telegram_bot_init, db_utils
 from handlers import callbacks_settings, callbacks_options, callbacks_profile, commands, messages
-from logs.log import logs
+from logs.log import logs, set_info_bot
 from pathlib import Path
 from hypercorn.asyncio import serve
 from hypercorn.config import Config
@@ -122,6 +122,8 @@ async def main():
                 close_bot_session=False,
             )
         )
+
+        await set_info_bot(info_bot)
 
         web_task = asyncio.create_task(run_web_app(shutdown_event))
 

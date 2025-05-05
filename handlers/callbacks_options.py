@@ -172,6 +172,7 @@ async def handle_text_input(message: types.Message, state: FSMContext):
             )
             await logs(f"[FSM] Error {image_response.status_code} loading image: {return_message}", type_e="error")
         
+        await state.clear()
         await logs(f"Image generation message processed for user {chat_id}", type_e="info")
 
 @callbacks_options_router.message(CheckImageState.waiting_for_image_input)

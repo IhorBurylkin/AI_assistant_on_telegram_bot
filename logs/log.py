@@ -30,11 +30,11 @@ async def init_logging():
     )
     _initialized = True
 
-def set_info_bot(bot):
+async def set_info_bot(bot):
     """Set the info bot instance to use for logging"""
     global _info_bot
     _info_bot = bot
-
+    await logs("Info_bot for logging set successfully", type_e="info")
 
 async def send_info_msg(text=None, message_thread_id=None, info_bot=None, chat_id=None):
     """
@@ -50,6 +50,11 @@ async def send_info_msg(text=None, message_thread_id=None, info_bot=None, chat_i
                 await info_bot.send_message(chat_id=chat_id, text=text, message_thread_id=LOGGING_SETTINGS_TO_SEND["message_thread_id"])
             else:
                 await info_bot.send_message(chat_id=chat_id, text=text)
+        elif _info_bot is not None:
+            if LOGGING_SETTINGS_TO_SEND["permission"] and LOGGING_SETTINGS_TO_SEND["message_thread_id"] not in [None, 0]:
+                await _info_bot.send_message(chat_id=chat_id, text=text, message_thread_id=LOGGING_SETTINGS_TO_SEND["message_thread_id"])
+            else:
+                await _info_bot.send_message(chat_id=chat_id, text=text)
         else:
             # Log that we couldn't send the message due to missing bot instance
             logging.warning("Could not send info message - info_bot instance not provided")

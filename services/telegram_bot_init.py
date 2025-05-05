@@ -39,7 +39,6 @@ async def initialize_bots():
     
     info_bot = await create_bot(info_token)
     dp_info_bot = Dispatcher(storage=storage_info)
-    set_info_bot(info_bot)
 
     return bot, dp, info_bot, dp_info_bot
 

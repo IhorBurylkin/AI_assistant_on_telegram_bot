@@ -11,20 +11,20 @@ async def photo_message_ai_response(chat_id, lang, user_model, context_enabled, 
     :return: AI response
     """
     try:
-        await update_chat_history(chat_id, {"role": "user", "content": user_text})
-        user_text_saved = [{"role": "user", "content": user_text}]
-        await logs(f"Chat {chat_id} - user request saved", type_e="info")
+        # await update_chat_history(chat_id, {"role": "user", "content": user_text})
+        # user_text_saved = [{"role": "user", "content": user_text}]
+        # await logs(f"Chat {chat_id} - user request saved", type_e="info")
 
-        conversation_api = [{"role": "system", "content": role}]
-        if context_enabled:
-            conversation_api.extend(await read_chat_history(chat_id))
-        else:
-            conversation_api.extend(user_text_saved)
+        # conversation_api = [{"role": "system", "content": role}]
+        # if context_enabled:
+        #     conversation_api.extend(await read_chat_history(chat_id))
+        # else:
+        #     conversation_api.extend(user_text_saved)
 
         flagged, categories = await openai_api_photo_moderations(image_path, user_text)
         if flagged == False:
             if user_model in MODELS_OPEN_AI:
-                ai_response, usage_tokens = await openai_api_photo_request(lang, user_model, set_answer, web_enabled, conversation_api, image_path)
+                ai_response, usage_tokens = await openai_api_photo_request(lang, user_model, set_answer, web_enabled, user_text, image_path)
             elif user_model in MODELS_DEEPSEEK:
                 return f"<b>System: </b>{MESSAGES.get(lang, {}).get('error_422', 'An error occurred')}"
         else:
